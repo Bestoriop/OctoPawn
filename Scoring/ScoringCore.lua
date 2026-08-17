@@ -284,11 +284,85 @@ end
 -- Last tooltip that successfully received an OP Score (for /op breakdown)
 local lastScoredTooltip = nil
 
+-- Slot / armor markers that only appear on item tooltips (not spells/abilities)
+local ITEM_SLOT_MARKERS = {
+    ["Head"] = true, ["Neck"] = true, ["Shoulder"] = true, ["Shirt"] = true,
+    ["Chest"] = true, ["Waist"] = true, ["Legs"] = true, ["Feet"] = true,
+    ["Wrist"] = true, ["Hands"] = true, ["Finger"] = true, ["Trinket"] = true,
+    ["Back"] = true, ["One-Hand"] = true, ["Main Hand"] = true, ["Off Hand"] = true,
+    ["Two-Hand"] = true, ["Held In Off-hand"] = true, ["Ranged"] = true,
+    ["Wand"] = true, ["Thrown"] = true, ["Gun"] = true, ["Bow"] = true,
+    ["Crossbow"] = true, ["Relic"] = true, ["Tabard"] = true, ["Shield"] = true,
+    ["Cloth"] = true, ["Leather"] = true, ["Mail"] = true, ["Plate"] = true,
+}
+-- Also accept localized INVTYPE_* globals if present
+do
+    local keys = {
+        "INVTYPE_HEAD", "INVTYPE_NECK", "INVTYPE_SHOULDER", "INVTYPE_BODY",
+        "INVTYPE_CHEST", "INVTYPE_ROBE", "INVTYPE_WAIST", "INVTYPE_LEGS",
+        "INVTYPE_FEET", "INVTYPE_WRIST", "INVTYPE_HAND", "INVTYPE_FINGER",
+        "INVTYPE_TRINKET", "INVTYPE_CLOAK", "INVTYPE_WEAPON", "INVTYPE_WEAPONMAINHAND",
+        "INVTYPE_WEAPONOFFHAND", "INVTYPE_2HWEAPON", "INVTYPE_SHIELD", "INVTYPE_HOLDABLE",
+        "INVTYPE_RANGED", "INVTYPE_RANGEDRIGHT", "INVTYPE_THROWN", "INVTYPE_RELIC",
+        "INVTYPE_TABARD",
+    }
+    local i
+    for i = 1, table.getn(keys) do
+        local v = getglobal(keys[i])
+        if v and type(v) == "string" then ITEM_SLOT_MARKERS[v] = true end
+    end
+end
+
+-- True only for gear/item tooltips — blocks spells, abilities, talents, units, etc.
+local function IsItemTooltip(tooltip)
+    if not tooltip or not tooltip.NumLines then return false end
+    -- Set* hooks stash the link on real item tooltips
+    if tooltip.itemLink and type(tooltip.itemLink) == "string"
+        and string.find(tooltip.itemLink, "item:") then
+        return true
+    end
+
+    local num = tooltip:NumLines()
+    if not num or num < 1 then return false end
+
+    local i
+    for i = 1, num do
+        local fs = getglobal(tooltip:GetName() .. "TextLeft" .. i)
+        if fs then
+            local t = fs:GetText()
+            if t and t ~= "" then
+                if ITEM_SLOT_MARKERS[t] then return true end
+                local u = string.upper(t)
+                -- Classic item-only lines
+                if string.find(u, "SOULBOUND")
+                    or string.find(u, "BINDS WHEN")
+                    or string.find(u, "DURABILITY")
+                    or string.find(u, "^EQUIP:")
+                    or string.find(u, "CHANCE ON HIT")
+                    or string.find(u, "DAMAGE PER SECOND")
+                    or string.find(u, "%d+%s*%-%s*%d+%s+DAMAGE")
+                    or string.find(u, "^USE:")
+                    or string.find(u, "UNIQUE%-EQUIPPED")
+                    or string.find(u, "^UNIQUE")
+                    then
+                    return true
+                end
+            end
+        end
+    end
+    return false
+end
+
 local function AddScoreToTooltip(tooltip)
     if not tooltip or tooltip.octoPawnScored then return end
     -- Never score our private scan tooltip
     local name = tooltip.GetName and tooltip:GetName()
     if name == "OctoPawnScanTooltip" then return end
+
+    -- Only items — never spells, abilities, talents, or unit tips
+    if not IsItemTooltip(tooltip) then
+        return
+    end
 
     tooltip.octoPawnScored = true
     local score, results = OctoPawn_ScoreTooltip(tooltip)
@@ -313,15 +387,15 @@ end
 -- Find any currently-visible tooltip that has (or can produce) an item OP Score.
 -- Used by /op so breakdown works on Aux, Atlas-CFM, ItemRef, etc.
 function OctoPawn_GetActiveItemTooltip()
-    -- Prefer the one we most recently scored, if still visible
-    if lastScoredTooltip and lastScoredTooltip:IsVisible() then
+    -- Prefer the one we most recently scored, if still visible and still an item
+    if lastScoredTooltip and lastScoredTooltip:IsVisible() and IsItemTooltip(lastScoredTooltip) then
         local _, results = OctoPawn_ScoreTooltip(lastScoredTooltip)
         if results and table.getn(results) > 0 then
             return lastScoredTooltip
         end
     end
 
-    -- Fall back: scan known tooltip frames for a visible one with item stats
+    -- Fall back: scan known tooltip frames for a visible ITEM with stats
     local names = {
         "GameTooltip",
         "ItemRefTooltip",
@@ -341,7 +415,7 @@ function OctoPawn_GetActiveItemTooltip()
         local tip = getglobal(names[i])
         if tip and tip.IsVisible and tip:IsVisible() and tip.NumLines then
             local tipName = tip:GetName()
-            if tipName ~= "OctoPawnScanTooltip" then
+            if tipName ~= "OctoPawnScanTooltip" and IsItemTooltip(tip) then
                 local _, results = OctoPawn_ScoreTooltip(tip)
                 if results and table.getn(results) > 0 then
                     return tip
