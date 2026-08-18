@@ -230,6 +230,7 @@ initFrame:SetScript("OnEvent", function()
         if type(OctoPawnDB.dr) ~= "table" then OctoPawnDB.dr = {} end
         if type(OctoPawnDB.defaultOverrides) ~= "table" then OctoPawnDB.defaultOverrides = {} end
         if OctoPawnDB.showAllSpecs == nil then OctoPawnDB.showAllSpecs = false end
+        if OctoPawnDB.compactTooltips == nil then OctoPawnDB.compactTooltips = false end
         if OctoPawnDB.role then
             local role = OctoPawnDB.role
             if OctoPawnDB.useCustom and OctoPawnDB.customWeights[role] then

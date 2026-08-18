@@ -378,8 +378,17 @@ local function AddScoreToTooltip(tooltip)
     if OctoPawnDB and OctoPawnDB.showAllSpecs then
         AddAllSpecsToTooltip(tooltip)
     else
-        tooltip:AddLine("|cFF00FF00OP Score: " .. string.format("%.1f", score) .. "|r")
-        if OctoPawn_ShowComparison then OctoPawn_ShowComparison(tooltip, score) end
+        local compact = OctoPawnDB and OctoPawnDB.compactTooltips
+        if compact then
+            local line = "|cFF00FF00OP Score: " .. string.format("%.1f", score) .. "|r"
+            if OctoPawn_FormatCompactDiffs then
+                line = line .. (OctoPawn_FormatCompactDiffs(tooltip, score) or "")
+            end
+            tooltip:AddLine(line)
+        else
+            tooltip:AddLine("|cFF00FF00OP Score: " .. string.format("%.1f", score) .. "|r")
+            if OctoPawn_ShowComparison then OctoPawn_ShowComparison(tooltip, score) end
+        end
     end
     tooltip:Show()
 end

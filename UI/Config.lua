@@ -186,6 +186,29 @@ local function SyncAllSpecsCheck()
     end
 end
 
+-------------------------------------------------
+-- Compact tooltips checkbox (off by default)
+-------------------------------------------------
+local compactCheck = CreateFrame("CheckButton", "OctoPawnCompactCheck", configFrame, "UICheckButtonTemplate")
+compactCheck:SetWidth(24); compactCheck:SetHeight(24)
+compactCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -100, -276)
+compactCheck:SetScript("OnClick", function()
+    if not OctoPawnDB then OctoPawnDB = {} end
+    OctoPawnDB.compactTooltips = this:GetChecked() and true or false
+end)
+local compactLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+compactLabel:SetPoint("RIGHT", compactCheck, "LEFT", -2, 0)
+compactLabel:SetText("Compact tooltips")
+
+local function SyncCompactCheck()
+    if not compactCheck then return end
+    if OctoPawnDB and OctoPawnDB.compactTooltips then
+        compactCheck:SetChecked(1)
+    else
+        compactCheck:SetChecked(0)
+    end
+end
+
 function OctoPawn_RefreshCompareButton() UpdateCompareButtonText() end
 
 -------------------------------------------------
@@ -480,6 +503,7 @@ function BuildEditBoxes()
         end
         UpdateCompareButtonText()
         SyncAllSpecsCheck()
+        SyncCompactCheck()
         return
     end
     local saved = (OctoPawnDB and OctoPawnDB.weights) or {}
@@ -540,6 +564,7 @@ function BuildEditBoxes()
     end
     UpdateCompareButtonText()
     SyncAllSpecsCheck()
+    SyncCompactCheck()
 end
 
 local saveBtn = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
@@ -554,7 +579,7 @@ configFrame:SetScript("OnHide", function() SaveWeights() end)
 
 function ToggleConfigFrame()
     if configFrame:IsShown() then configFrame:Hide()
-    else BuildEditBoxes(); UpdateCompareButtonText(); SyncAllSpecsCheck(); configFrame:Show() end
+    else BuildEditBoxes(); UpdateCompareButtonText(); SyncAllSpecsCheck(); SyncCompactCheck(); configFrame:Show() end
 end
 
 function OctoPawn_ShowRolePicker()

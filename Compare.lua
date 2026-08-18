@@ -48,19 +48,22 @@ local function FormatDiff(diff)
     elseif diff < -0.05 then return string.format("|cFFFF0000(%.1f)|r", diff)
     else return "|cFFAAAAAA(+0.0)|r" end
 end
-function OctoPawn_ShowComparison(tooltip, score)
-    if OctoPawnDB and OctoPawnDB.compareEnabled == false then return end
-    if not score then return end
+
+-- Returns list of { score, label, slot } for equipped items in the same slot set.
+-- Returns nil if compare is off, no slots, or item is already equipped.
+local function CollectEquippedComparisons(tooltip, score)
+    if OctoPawnDB and OctoPawnDB.compareEnabled == false then return nil end
+    if not score then return nil end
     local slots = OctoPawn_GetCompareSlotsFromTooltip(tooltip)
-    if not slots then return end
+    if not slots then return nil end
     local link = tooltip.itemLink
     local s
     for _, s in ipairs(slots) do
         local eq = GetInventoryItemLink("player", s)
-        if link and eq and link == eq then return end
+        if link and eq and link == eq then return nil end
     end
     local tip = OctoPawn_GetScanTooltip and OctoPawn_GetScanTooltip()
-    if not tip then return end
+    if not tip then return nil end
     local equippedList = {}
     for _, s in ipairs(slots) do
         if GetInventoryItemLink("player", s) then
@@ -74,7 +77,29 @@ function OctoPawn_ShowComparison(tooltip, score)
             table.insert(equippedList, { score = eqScore or 0, label = SLOT_LABEL[s] or ("Slot "..s), slot = s })
         end
     end
-    if table.getn(equippedList) == 0 then return end
+    if table.getn(equippedList) == 0 then return nil end
+    return equippedList
+end
+
+-- Compact: space-separated diffs only, no slot names. e.g. " (+1.2) (-0.3)"
+function OctoPawn_FormatCompactDiffs(tooltip, score)
+    local equippedList = CollectEquippedComparisons(tooltip, score)
+    if not equippedList then return "" end
+    local parts = ""
+    local _, eq
+    for _, eq in ipairs(equippedList) do
+        parts = parts .. " " .. FormatDiff(score - eq.score)
+    end
+    return parts
+end
+
+function OctoPawn_ShowComparison(tooltip, score)
+    local equippedList = CollectEquippedComparisons(tooltip, score)
+    if not equippedList then return end
+    if OctoPawnDB and OctoPawnDB.compactTooltips then
+        -- Compact path is handled by AddScoreToTooltip via FormatCompactDiffs
+        return
+    end
     local _, eq
     for _, eq in ipairs(equippedList) do
         tooltip:AddLine(FormatDiff(score - eq.score) .. " |cFFAAAAAAvs " .. eq.label .. "|r")
