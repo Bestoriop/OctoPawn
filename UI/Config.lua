@@ -585,8 +585,8 @@ end
 function OctoPawn_ShowRolePicker()
     if not rolePickerFrame then
         rolePickerFrame = CreateFrame("Frame", "OctoPawnRolePicker", UIParent)
-        rolePickerFrame:SetWidth(280)
-        rolePickerFrame:SetHeight(320)
+        rolePickerFrame:SetWidth(360)
+        rolePickerFrame:SetHeight(360)
         rolePickerFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         rolePickerFrame:SetBackdrop({
             bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
@@ -601,9 +601,14 @@ function OctoPawn_ShowRolePicker()
         rolePickerFrame:SetScript("OnDragStart", function() this:StartMoving() end)
         rolePickerFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
         local pickerTitle = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-        pickerTitle:SetPoint("TOP", rolePickerFrame, "TOP", 0, -18)
+        pickerTitle:SetPoint("TOP", rolePickerFrame, "TOP", 0, -14)
         pickerTitle:SetText("Choose Role")
         rolePickerFrame.title = pickerTitle
+        local hint = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        hint:SetPoint("TOP", pickerTitle, "BOTTOM", 0, -4)
+        hint:SetTextColor(0.7, 0.7, 0.7)
+        hint:SetText("Tip = show this spec on item tooltips")
+        rolePickerFrame.hint = hint
         rolePickerFrame.buttons = {}
     end
 
@@ -640,49 +645,220 @@ function OctoPawn_ShowRolePicker()
 
     rolePickerFrame.title:SetText("OctoPawn - " .. tostring(class))
 
-    local y = -60
+    local y = -50
     local buttonCount = 0
     local ri
+
+    local function Track(frame)
+        table.insert(rolePickerFrame.buttons, frame)
+    end
+
+    local function SelectRole(roleName, isCustom)
+        if OctoPawn_ApplyRole then OctoPawn_ApplyRole(roleName, isCustom) end
+        rolePickerFrame:Hide()
+        WipeEditBoxes()
+        if configFrame and configFrame:IsShown() then BuildEditBoxes() end
+    end
+
     for ri = 1, table.getn(roles) do
         local role = roles[ri]
+        local isBuiltIn = OctoPawn_IsBuiltInRole and OctoPawn_IsBuiltInRole(class, role)
+        local hasCustom = OctoPawn_HasCustomWeights and OctoPawn_HasCustomWeights(role)
+        local isPureCustom = hasCustom and not isBuiltIn
+
         local btn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-        btn:SetWidth(200)
-        btn:SetHeight(28)
-        btn:SetPoint("TOP", rolePickerFrame, "TOP", 0, y)
+        btn:SetWidth(isPureCustom and 160 or 180)
+        btn:SetHeight(26)
+        btn:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 24, y)
         btn:SetText(role)
         btn.roleName = role
         btn:SetScript("OnClick", function()
-            if OctoPawn_ApplyRole then OctoPawn_ApplyRole(this.roleName, false) end
-            rolePickerFrame:Hide()
-            WipeEditBoxes()
-            if configFrame and configFrame:IsShown() then BuildEditBoxes() end
+            SelectRole(this.roleName, isPureCustom and true or false)
         end)
-        table.insert(rolePickerFrame.buttons, btn)
-        y = y - 32
+        Track(btn)
+
+        local tip = CreateFrame("CheckButton", nil, rolePickerFrame, "UICheckButtonTemplate")
+        tip:SetWidth(24); tip:SetHeight(24)
+        tip:SetPoint("LEFT", btn, "RIGHT", 4, 0)
+        tip.roleName = role
+        if OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role) then tip:SetChecked(1) else tip:SetChecked(0) end
+        tip:SetScript("OnClick", function()
+            if OctoPawn_SetTipSpec then
+                OctoPawn_SetTipSpec(this.roleName, this:GetChecked() and true or false)
+            end
+        end)
+        tip:SetScript("OnEnter", function()
+            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+            GameTooltip:SetText("Show on tip", 1, 1, 1)
+            GameTooltip:AddLine("Include this spec on item tooltips", 0.7, 0.7, 0.7, 1)
+            GameTooltip:Show()
+        end)
+        tip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+        Track(tip)
+
+        local tipLbl = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        tipLbl:SetPoint("LEFT", tip, "RIGHT", 0, 0)
+        tipLbl:SetText("Tip")
+        Track(tipLbl)
+
+        if hasCustom then
+            local del = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
+            del:SetWidth(28); del:SetHeight(24)
+            del:SetPoint("LEFT", tipLbl, "RIGHT", 8, 0)
+            del:SetText("X")
+            del.roleName = role
+            del:SetScript("OnClick", function()
+                local ok, err = OctoPawn_DeleteCustomSpec and OctoPawn_DeleteCustomSpec(this.roleName)
+                if ok then
+                    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Deleted custom '" .. tostring(this.roleName) .. "'.|r")
+                    OctoPawn_ShowRolePicker()
+                else
+                    DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: " .. tostring(err or "delete failed") .. "|r")
+                end
+            end)
+            del:SetScript("OnEnter", function()
+                GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Delete custom", 1, 0.3, 0.3)
+                if isBuiltIn then
+                    GameTooltip:AddLine("Removes saved custom weights for this role", 0.7, 0.7, 0.7, 1)
+                else
+                    GameTooltip:AddLine("Deletes this custom profile entirely", 0.7, 0.7, 0.7, 1)
+                end
+                GameTooltip:Show()
+            end)
+            del:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            Track(del)
+
+            if isPureCustom then
+                local ren = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
+                ren:SetWidth(40); ren:SetHeight(24)
+                ren:SetPoint("LEFT", del, "RIGHT", 2, 0)
+                ren:SetText("Ren")
+                ren.roleName = role
+                ren:SetScript("OnClick", function()
+                    if rolePickerFrame.renameBox then
+                        rolePickerFrame.renameBox:Show()
+                        rolePickerFrame.renameBox:SetText(this.roleName)
+                        rolePickerFrame.renameBox.oldName = this.roleName
+                        rolePickerFrame.renameBox:SetFocus()
+                    end
+                end)
+                Track(ren)
+            end
+        end
+
+        y = y - 30
         buttonCount = buttonCount + 1
 
-        if OctoPawnDB and OctoPawnDB.customWeights and OctoPawnDB.customWeights[role] then
+        if isBuiltIn and hasCustom then
             local cbtn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-            cbtn:SetWidth(200)
-            cbtn:SetHeight(28)
-            cbtn:SetPoint("TOP", rolePickerFrame, "TOP", 0, y)
+            cbtn:SetWidth(180)
+            cbtn:SetHeight(26)
+            cbtn:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 24, y)
             cbtn:SetText(role .. " (custom)")
             cbtn.roleName = role
             cbtn:SetScript("OnClick", function()
-                if OctoPawn_ApplyRole then OctoPawn_ApplyRole(this.roleName, true) end
-                rolePickerFrame:Hide()
-                WipeEditBoxes()
-                if configFrame and configFrame:IsShown() then BuildEditBoxes() end
+                SelectRole(this.roleName, true)
             end)
-            table.insert(rolePickerFrame.buttons, cbtn)
-            y = y - 32
+            Track(cbtn)
+            y = y - 30
             buttonCount = buttonCount + 1
         end
     end
 
-    local height = 80 + (buttonCount * 32)
-    if height < 160 then height = 160 end
-    if height > 500 then height = 500 end
+    y = y - 6
+    local newLbl = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    newLbl:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 28, y)
+    newLbl:SetText("New profile:")
+    Track(newLbl)
+
+    local newBox = CreateFrame("EditBox", "OctoPawnNewSpecBox", rolePickerFrame)
+    newBox:SetWidth(120); newBox:SetHeight(22)
+    newBox:SetPoint("LEFT", newLbl, "RIGHT", 6, 0)
+    newBox:SetAutoFocus(false)
+    newBox:SetFontObject(GameFontHighlight)
+    newBox:SetText("")
+    if newBox.SetBackdrop then
+        newBox:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 8, edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 }
+        })
+        newBox:SetBackdropColor(0, 0, 0, 0.8)
+    end
+    Track(newBox)
+
+    local newBtn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
+    newBtn:SetWidth(50); newBtn:SetHeight(24)
+    newBtn:SetPoint("LEFT", newBox, "RIGHT", 4, 0)
+    newBtn:SetText("Add")
+    newBtn:SetScript("OnClick", function()
+        local name = newBox:GetText() or ""
+        local ok, err = OctoPawn_CreateCustomSpec and OctoPawn_CreateCustomSpec(name)
+        if ok then
+            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Created profile '" .. name .. "'.|r")
+            newBox:SetText("")
+            OctoPawn_ShowRolePicker()
+        else
+            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: " .. tostring(err or "create failed") .. "|r")
+        end
+    end)
+    Track(newBtn)
+    y = y - 28
+
+    if not rolePickerFrame.renameBox then
+        local rb = CreateFrame("EditBox", "OctoPawnRenameSpecBox", rolePickerFrame)
+        rb:SetWidth(140); rb:SetHeight(22)
+        rb:SetPoint("BOTTOM", rolePickerFrame, "BOTTOM", -30, 36)
+        rb:SetAutoFocus(false)
+        rb:SetFontObject(GameFontHighlight)
+        rb:Hide()
+        if rb.SetBackdrop then
+            rb:SetBackdrop({
+                bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+                edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+                tile = true, tileSize = 8, edgeSize = 8,
+                insets = { left = 2, right = 2, top = 2, bottom = 2 }
+            })
+            rb:SetBackdropColor(0, 0, 0, 0.9)
+        end
+        rolePickerFrame.renameBox = rb
+        local rok = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
+        rok:SetWidth(50); rok:SetHeight(24)
+        rok:SetPoint("LEFT", rb, "RIGHT", 4, 0)
+        rok:SetText("OK")
+        rok:SetScript("OnClick", function()
+            local old = rb.oldName
+            local newn = rb:GetText() or ""
+            local ok, err = OctoPawn_RenameCustomSpec and OctoPawn_RenameCustomSpec(old, newn)
+            if ok then
+                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Renamed to '" .. newn .. "'.|r")
+                rb:Hide(); rok:Hide()
+                OctoPawn_ShowRolePicker()
+            else
+                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: " .. tostring(err or "rename failed") .. "|r")
+            end
+        end)
+        rok:Hide()
+        rolePickerFrame.renameOk = rok
+        rb:SetScript("OnShow", function() if rolePickerFrame.renameOk then rolePickerFrame.renameOk:Show() end end)
+        rb:SetScript("OnHide", function() if rolePickerFrame.renameOk then rolePickerFrame.renameOk:Hide() end end)
+    else
+        rolePickerFrame.renameBox:Hide()
+        if rolePickerFrame.renameOk then rolePickerFrame.renameOk:Hide() end
+    end
+
+    local closeBtn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
+    closeBtn:SetWidth(80); closeBtn:SetHeight(24)
+    closeBtn:SetPoint("BOTTOM", rolePickerFrame, "BOTTOM", 0, 12)
+    closeBtn:SetText("Close")
+    closeBtn:SetScript("OnClick", function() rolePickerFrame:Hide() end)
+    Track(closeBtn)
+
+    local height = 100 + (buttonCount * 30) + 60
+    if height < 200 then height = 200 end
+    if height > 520 then height = 520 end
     rolePickerFrame:SetHeight(height)
     rolePickerFrame:Show()
 end

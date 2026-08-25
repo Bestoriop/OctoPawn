@@ -37,14 +37,145 @@ function OctoPawn_GetDefaultsForClass(class)
     return {}
 end
 
+function OctoPawn_IsBuiltInRole(class, role)
+    if not class or not role then return false end
+    local classTable = defaultWeights and defaultWeights[class]
+    return classTable and type(classTable[role]) == "table"
+end
+
+-- Built-in class roles + any custom-named profiles (e.g. "PVP")
 function OctoPawn_GetRolesForClass(class)
     local classTable = defaultWeights and defaultWeights[class]
-    if not classTable then return { "Default" } end
     local roles = {}
-    for role in pairs(classTable) do table.insert(roles, role) end
+    local seen = {}
+    if classTable then
+        for role in pairs(classTable) do
+            if type(classTable[role]) == "table" then
+                table.insert(roles, role)
+                seen[role] = true
+            end
+        end
+    end
+    if OctoPawnDB and type(OctoPawnDB.customWeights) == "table" then
+        for role, w in pairs(OctoPawnDB.customWeights) do
+            if type(w) == "table" and not seen[role] then
+                table.insert(roles, role)
+                seen[role] = true
+            end
+        end
+    end
     if table.getn(roles) == 0 then return { "Default" } end
     table.sort(roles)
     return roles
+end
+
+function OctoPawn_HasCustomWeights(role)
+    return OctoPawnDB and OctoPawnDB.customWeights and type(OctoPawnDB.customWeights[role]) == "table"
+        and next(OctoPawnDB.customWeights[role]) ~= nil
+end
+
+function OctoPawn_IsTipSpec(role)
+    if not role or not OctoPawnDB then return false end
+    if type(OctoPawnDB.tipSpecs) ~= "table" then return false end
+    return OctoPawnDB.tipSpecs[role] and true or false
+end
+
+function OctoPawn_SetTipSpec(role, enabled)
+    if not role then return end
+    if not OctoPawnDB then OctoPawnDB = {} end
+    if type(OctoPawnDB.tipSpecs) ~= "table" then OctoPawnDB.tipSpecs = {} end
+    if enabled then
+        OctoPawnDB.tipSpecs[role] = true
+    else
+        OctoPawnDB.tipSpecs[role] = nil
+    end
+end
+
+function OctoPawn_AnyTipSpecsEnabled()
+    if not OctoPawnDB or type(OctoPawnDB.tipSpecs) ~= "table" then return false end
+    local r, v
+    for r, v in pairs(OctoPawnDB.tipSpecs) do
+        if v then return true end
+    end
+    return false
+end
+
+function OctoPawn_DeleteCustomSpec(role)
+    if not role or not OctoPawnDB then return false, "Invalid" end
+    if not OctoPawnDB.customWeights or not OctoPawnDB.customWeights[role] then
+        return false, "No custom weights for " .. tostring(role)
+    end
+    OctoPawnDB.customWeights[role] = nil
+    if OctoPawnDB.tipSpecs then OctoPawnDB.tipSpecs[role] = nil end
+    local class = OctoPawn_GetClass and OctoPawn_GetClass()
+    local wasBuiltIn = OctoPawn_IsBuiltInRole(class, role)
+    if OctoPawnDB.role == role then
+        if wasBuiltIn then
+            OctoPawn_ApplyRole(role, false)
+        else
+            local roles = OctoPawn_GetRolesForClass(class)
+            local fallback = roles[1] or "Default"
+            OctoPawn_ApplyRole(fallback, false)
+        end
+    end
+    return true
+end
+
+function OctoPawn_RenameCustomSpec(oldName, newName)
+    if not oldName or not newName or oldName == "" or newName == "" then
+        return false, "Need old and new names"
+    end
+    newName = string.gsub(newName, "^%s*(.-)%s*$", "%1")
+    if newName == "" then return false, "Empty name" end
+    if not OctoPawnDB or not OctoPawnDB.customWeights or not OctoPawnDB.customWeights[oldName] then
+        return false, "No custom profile named " .. tostring(oldName)
+    end
+    local class = OctoPawn_GetClass and OctoPawn_GetClass()
+    if OctoPawn_IsBuiltInRole(class, newName) then
+        return false, "Name conflicts with a built-in role"
+    end
+    if OctoPawnDB.customWeights[newName] then
+        return false, "A profile named " .. newName .. " already exists"
+    end
+    OctoPawnDB.customWeights[newName] = OctoPawnDB.customWeights[oldName]
+    OctoPawnDB.customWeights[oldName] = nil
+    if OctoPawnDB.tipSpecs and OctoPawnDB.tipSpecs[oldName] then
+        OctoPawnDB.tipSpecs[newName] = true
+        OctoPawnDB.tipSpecs[oldName] = nil
+    end
+    if OctoPawnDB.role == oldName then
+        OctoPawnDB.role = newName
+        OctoPawnDB.useCustom = true
+    end
+    return true
+end
+
+function OctoPawn_CreateCustomSpec(name)
+    if not name or name == "" then return false, "Need a name" end
+    name = string.gsub(name, "^%s*(.-)%s*$", "%1")
+    if name == "" then return false, "Empty name" end
+    local class = OctoPawn_GetClass and OctoPawn_GetClass()
+    if OctoPawn_IsBuiltInRole(class, name) then
+        return false, "Name conflicts with a built-in role"
+    end
+    if not OctoPawnDB then OctoPawnDB = {} end
+    if not OctoPawnDB.customWeights then OctoPawnDB.customWeights = {} end
+    if OctoPawnDB.customWeights[name] then
+        return false, "Already exists"
+    end
+    local src = OctoPawnDB.weights or {}
+    OctoPawnDB.customWeights[name] = {}
+    local k, v
+    for k, v in pairs(src) do
+        OctoPawnDB.customWeights[name][k] = v
+    end
+    if not next(OctoPawnDB.customWeights[name]) then
+        local base = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
+        for k, v in pairs(base) do
+            OctoPawnDB.customWeights[name][k] = v
+        end
+    end
+    return true
 end
 
 -- Weights for a specific role: custom if saved, else class defaults (+ overrides)
@@ -72,12 +203,10 @@ end
 function OctoPawn_ApplyRole(role, isCustom)
     local class = OctoPawn_GetClass()
     local classTable = defaultWeights and defaultWeights[class]
-    if not classTable then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: No defaults for " .. tostring(class) .. "|r")
-        return
-    end
-    local source = classTable[role]
-    if not source then
+    local source = classTable and classTable[role]
+    local hasCustom = OctoPawnDB and OctoPawnDB.customWeights and OctoPawnDB.customWeights[role]
+    -- Pure custom profile (e.g. "PVP") has no built-in source
+    if not source and not hasCustom then
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: Unknown role " .. tostring(role) .. "|r")
         return
     end
@@ -85,18 +214,19 @@ function OctoPawn_ApplyRole(role, isCustom)
     if not OctoPawnDB.customWeights then OctoPawnDB.customWeights = {} end
     OctoPawnDB.role = role
     OctoPawnDB.weights = {}
-    if isCustom and OctoPawnDB.customWeights[role] then
+    if (isCustom or not source) and hasCustom then
         OctoPawnDB.useCustom = true
         for stat, value in pairs(OctoPawnDB.customWeights[role]) do
             OctoPawnDB.weights[stat] = value
         end
-        -- fill any missing from defaults
-        for stat, value in pairs(source) do
-            if OctoPawnDB.weights[stat] == nil then
-                OctoPawnDB.weights[stat] = value
+        if source then
+            for stat, value in pairs(source) do
+                if OctoPawnDB.weights[stat] == nil then
+                    OctoPawnDB.weights[stat] = value
+                end
             end
         end
-    else
+    elseif source then
         OctoPawnDB.useCustom = nil
         local weights = source
         if OctoPawnDB.defaultOverrides and OctoPawnDB.defaultOverrides[class]
@@ -109,7 +239,7 @@ function OctoPawn_ApplyRole(role, isCustom)
             OctoPawnDB.weights[stat] = value
         end
     end
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Using " .. role .. (isCustom and " (custom)" or "") .. " weights.|r")
+    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Using " .. role .. ((isCustom or not source) and " (custom)" or "") .. " weights.|r")
     if OctoPawn_UpdatePlayerPaperScore then OctoPawn_UpdatePlayerPaperScore() end
 end
 
@@ -229,8 +359,21 @@ initFrame:SetScript("OnEvent", function()
         if type(OctoPawnDB.inspectRole) ~= "table" then OctoPawnDB.inspectRole = {} end
         if type(OctoPawnDB.dr) ~= "table" then OctoPawnDB.dr = {} end
         if type(OctoPawnDB.defaultOverrides) ~= "table" then OctoPawnDB.defaultOverrides = {} end
+        if type(OctoPawnDB.tipSpecs) ~= "table" then OctoPawnDB.tipSpecs = {} end
         if OctoPawnDB.showAllSpecs == nil then OctoPawnDB.showAllSpecs = false end
         if OctoPawnDB.compactTooltips == nil then OctoPawnDB.compactTooltips = false end
+        -- One-time migration: old "all specs on tips" → tipSpecs for every known role
+        if OctoPawnDB.showAllSpecs and not OctoPawnDB.tipSpecsMigrated then
+            local class = select and nil
+            local _, c = UnitClass("player")
+            class = c
+            local roles = OctoPawn_GetRolesForClass and OctoPawn_GetRolesForClass(class) or {}
+            local ri
+            for ri = 1, table.getn(roles) do
+                OctoPawnDB.tipSpecs[roles[ri]] = true
+            end
+            OctoPawnDB.tipSpecsMigrated = true
+        end
         if OctoPawnDB.role then
             local role = OctoPawnDB.role
             if OctoPawnDB.useCustom and OctoPawnDB.customWeights[role] then

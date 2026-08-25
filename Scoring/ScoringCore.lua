@@ -251,33 +251,42 @@ local function AddAllSpecsToTooltip(tooltip)
     local currentRole = OctoPawnDB and OctoPawnDB.role
     local slots = OctoPawn_GetCompareSlotsFromTooltip and OctoPawn_GetCompareSlotsFromTooltip(tooltip)
     local compareOn = not (OctoPawnDB and OctoPawnDB.compareEnabled == false)
+    local useTipFilter = OctoPawn_AnyTipSpecsEnabled and OctoPawn_AnyTipSpecsEnabled()
+    local legacyAll = OctoPawnDB and OctoPawnDB.showAllSpecs and not useTipFilter
 
     local ri
     for ri = 1, table.getn(roles) do
         local role = roles[ri]
-        local weights = OctoPawn_GetWeightsForRole and OctoPawn_GetWeightsForRole(class, role) or {}
-        local score = OctoPawn_ScoreTooltip(tooltip, weights) or 0
-        local line = string.format("%s: |cFFFFFFFF%.1f|r", role, score)
-        if compareOn and slots then
-            local eqList = EquippedScoresForSlots(slots, weights)
-            if eqList then
-                local ei
-                for ei = 1, table.getn(eqList) do
-                    local eq = eqList[ei]
-                    local diffStr = FormatSpecDiff(score - eq.score)
-                    if eq.label then
-                        -- multi-slot: " (+1.2)1 " or " (+0.5)MH "
-                        line = line .. " " .. diffStr .. eq.label
-                    else
-                        line = line .. " " .. diffStr
+        local show = false
+        if useTipFilter then
+            show = OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role)
+        elseif legacyAll then
+            show = true
+        end
+        if show then
+            local weights = OctoPawn_GetWeightsForRole and OctoPawn_GetWeightsForRole(class, role) or {}
+            local score = OctoPawn_ScoreTooltip(tooltip, weights) or 0
+            local line = string.format("%s: |cFFFFFFFF%.1f|r", role, score)
+            if compareOn and slots then
+                local eqList = EquippedScoresForSlots(slots, weights)
+                if eqList then
+                    local ei
+                    for ei = 1, table.getn(eqList) do
+                        local eq = eqList[ei]
+                        local diffStr = FormatSpecDiff(score - eq.score)
+                        if eq.label then
+                            line = line .. " " .. diffStr .. eq.label
+                        else
+                            line = line .. " " .. diffStr
+                        end
                     end
                 end
             end
+            if currentRole and role == currentRole then
+                line = line .. " |cFF00FF00(Current)|r"
+            end
+            tooltip:AddLine(line)
         end
-        if currentRole and role == currentRole then
-            line = line .. " |cFF00FF00(Current)|r"
-        end
-        tooltip:AddLine(line)
     end
 end
 
@@ -375,7 +384,9 @@ local function AddScoreToTooltip(tooltip)
     lastScoredTooltip = tooltip
 
     tooltip:AddLine(" ")
-    if OctoPawnDB and OctoPawnDB.showAllSpecs then
+    local multi = (OctoPawn_AnyTipSpecsEnabled and OctoPawn_AnyTipSpecsEnabled())
+        or (OctoPawnDB and OctoPawnDB.showAllSpecs)
+    if multi then
         AddAllSpecsToTooltip(tooltip)
     else
         local compact = OctoPawnDB and OctoPawnDB.compactTooltips
