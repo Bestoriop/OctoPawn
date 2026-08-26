@@ -421,7 +421,8 @@ local function BuildAdvancedRows()
         f:SetWidth(380); f:SetHeight(24)
         f:SetPoint("TOPLEFT", advancedFrame.child, "TOPLEFT", 4, y)
         local lab = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lab:SetPoint("LEFT", 2, 0); lab:SetWidth(170); lab:SetJustifyH("LEFT"); lab:SetText(stat)
+        lab:SetPoint("LEFT", 2, 0); lab:SetWidth(170); lab:SetJustifyH("LEFT")
+        lab:SetText(StatLabel(stat))
         local soft = CreateFrame("EditBox", nil, f)
         soft:SetWidth(70); soft:SetHeight(18); soft:SetPoint("LEFT", 180, 0)
         soft:SetAutoFocus(false); soft:SetFontObject("GameFontHighlight"); soft:SetJustifyH("CENTER")
@@ -489,6 +490,19 @@ local function SaveWeights()
     OctoPawnDB.useCustom = true
 end
 
+local function StatLabel(stat)
+    if OctoPawn_StatLabel then return OctoPawn_StatLabel(stat) end
+    -- Fallback if Helpers not loaded yet
+    local map = {
+        DPS = "WEAPON DPS", CRIT = "CRIT %", HIT = "HIT %",
+        DODGE = "DODGE %", PARRY = "PARRY %", BLOCK = "BLOCK %", HASTE = "HASTE %",
+        ["SPELL CRIT"] = "SPELL CRIT %", ["SPELL HIT"] = "SPELL HIT %",
+        ["RANGED CRIT"] = "RANGED CRIT %", ["RANGED HASTE"] = "RANGED HASTE %",
+        ["HOLY CRIT"] = "HOLY CRIT %", AVOIDANCE = "AVOIDANCE %", RESILIENCE = "RESILIENCE %",
+    }
+    return map[stat] or stat
+end
+
 function BuildEditBoxes()
     local playerClass = OctoPawn_GetClass and OctoPawn_GetClass() or "?"
     local role = (OctoPawnDB and OctoPawnDB.role) or "Default"
@@ -500,6 +514,7 @@ function BuildEditBoxes()
         for stat, box in pairs(editBoxes) do
             local value = saved[stat]; if value == nil then value = defaults[stat] or 1.0 end
             box:SetText(tostring(value))
+            if box.opLabel then box.opLabel:SetText(StatLabel(stat)) end
         end
         UpdateCompareButtonText()
         SyncAllSpecsCheck()
@@ -534,7 +549,9 @@ function BuildEditBoxes()
             if clean ~= text then this:SetText(clean) end
         end)
         local label = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        label:SetPoint("LEFT", box, "RIGHT", 12, 0); label:SetText(stat)
+        label:SetPoint("LEFT", box, "RIGHT", 12, 0)
+        label:SetText(StatLabel(stat))
+        box.opLabel = label
         editBoxes[stat] = box
         table.insert(orderedBoxes, box)
         table.insert(createdFrames, box); table.insert(createdFrames, label)

@@ -10,12 +10,34 @@ function OctoPawn_Merge(base, over)
     return t
 end
 
+-- User-facing labels (config, /op breakdown). Internal keys stay the same.
+function OctoPawn_StatLabel(stat)
+    if not stat then return "" end
+    local map = {
+        DPS              = "WEAPON DPS",
+        CRIT             = "CRIT %",
+        HIT              = "HIT %",
+        DODGE            = "DODGE %",
+        PARRY            = "PARRY %",
+        BLOCK            = "BLOCK %",
+        HASTE            = "HASTE %",
+        ["SPELL CRIT"]   = "SPELL CRIT %",
+        ["SPELL HIT"]    = "SPELL HIT %",
+        ["RANGED CRIT"]  = "RANGED CRIT %",
+        ["RANGED HASTE"] = "RANGED HASTE %",
+        ["HOLY CRIT"]    = "HOLY CRIT %",
+        AVOIDANCE        = "AVOIDANCE %",
+        RESILIENCE       = "RESILIENCE %",
+    }
+    return map[stat] or stat
+end
+
 function OctoPawn_Fill(t)
     local keys = {
         "STRENGTH","AGILITY","STAMINA","INTELLECT","SPIRIT","ARMOR","DEFENSE",
         "DODGE","PARRY","BLOCK","BLOCK VALUE","ATTACK POWER","RANGED ATTACK POWER",
         "HIT","CRIT","DPS","HASTE","EXTRA ATTACK","ARMOR PENETRATION","LIFESTEAL",
-        "FORTUNE","AVOIDANCE","FERAL ATTACK POWER","ATTACK POWER UNDEAD","SPELL DAMAGE UNDEAD",
+        "FORTUNE","AVOIDANCE","RESILIENCE","FERAL ATTACK POWER","ATTACK POWER UNDEAD","SPELL DAMAGE UNDEAD",
         "RANGED HASTE","RANGED CRIT","HOLY CRIT","MOUNT SPEED","MOVEMENT SPEED",
         "HEALTH","MANA","HEALTH PER 5","MANA PER 5","CASTING REGEN",
         "SPELL POWER","SPELL DAMAGE","HEALING","SPELL HIT","SPELL CRIT","SPELL PENETRATION",

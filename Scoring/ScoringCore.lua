@@ -182,15 +182,16 @@ function OctoPawn_PrintBreakdown(title, score, results)
     end
     local _, r
     for _, r in ipairs(results) do
+        local label = (OctoPawn_StatLabel and OctoPawn_StatLabel(r.stat)) or r.stat
         if r.effective and r.effective ~= r.value then
             DEFAULT_CHAT_FRAME:AddMessage(string.format(
                 "|cFFFFFFFF%s|r: %.1f (eff %.1f) × %.2f = |cFF00FF00%.1f|r",
-                r.stat, r.value, r.effective, r.weight, r.score
+                label, r.value, r.effective, r.weight, r.score
             ))
         else
             DEFAULT_CHAT_FRAME:AddMessage(string.format(
                 "|cFFFFFFFF%s|r: %.1f × %.2f = |cFF00FF00%.1f|r",
-                r.stat, r.value, r.weight, r.score
+                label, r.value, r.weight, r.score
             ))
         end
     end

@@ -49,6 +49,12 @@ OctoPawn_StatPatterns = {
     { pattern = "DAMAGE FROM AREA OF EFFECT",              stat = "AVOIDANCE" },
     { pattern = "AREA OF EFFECT ATTACKS BY",               stat = "AVOIDANCE" },
     { pattern = "AVOIDANCE",                               stat = "AVOIDANCE" },
+    -- Resilience: crit/DoT damage taken reduction (e.g. Loop of Triage)
+    { pattern = "DAMAGE TAKEN FROM CRITICAL HITS AND DAMAGE OVER TIME", stat = "RESILIENCE" },
+    { pattern = "DAMAGE TAKEN FROM CRITICAL HITS",         stat = "RESILIENCE" },
+    { pattern = "CRITICAL HITS AND DAMAGE OVER TIME",      stat = "RESILIENCE" },
+    { pattern = "DAMAGE FROM CRITICAL HITS",               stat = "RESILIENCE" },
+    { pattern = "RESILIENCE",                              stat = "RESILIENCE" },
     { pattern = "ATTACK POWER IN CAT, BEAR, DIRE BEAR, AND MOONKIN", stat = "FERAL ATTACK POWER" },
     { pattern = "ATTACK POWER IN CAT, BEAR",               stat = "FERAL ATTACK POWER" },
     { pattern = "ATTACK POWER IN CAT",                     stat = "FERAL ATTACK POWER" },
