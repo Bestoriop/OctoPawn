@@ -12,6 +12,18 @@ local advRows = {}
 local shareFrame
 local allSpecsCheck
 
+local function StatLabel(stat)
+    if OctoPawn_StatLabel then return OctoPawn_StatLabel(stat) end
+    local map = {
+        DPS = "WEAPON DPS", CRIT = "CRIT %", HIT = "HIT %",
+        DODGE = "DODGE %", PARRY = "PARRY %", BLOCK = "BLOCK %", HASTE = "HASTE %",
+        ["SPELL CRIT"] = "SPELL CRIT %", ["SPELL HIT"] = "SPELL HIT %",
+        ["RANGED CRIT"] = "RANGED CRIT %", ["RANGED HASTE"] = "RANGED HASTE %",
+        ["HOLY CRIT"] = "HOLY CRIT %", AVOIDANCE = "AVOIDANCE %", RESILIENCE = "RESILIENCE %",
+    }
+    return map[stat] or stat
+end
+
 local function UpdateMinimapButtonPosition()
     if not OctoPawnMinimapBtn then return end
     local angle = 200
@@ -488,19 +500,6 @@ local function SaveWeights()
         OctoPawnDB.customWeights[role][stat] = val
     end
     OctoPawnDB.useCustom = true
-end
-
-local function StatLabel(stat)
-    if OctoPawn_StatLabel then return OctoPawn_StatLabel(stat) end
-    -- Fallback if Helpers not loaded yet
-    local map = {
-        DPS = "WEAPON DPS", CRIT = "CRIT %", HIT = "HIT %",
-        DODGE = "DODGE %", PARRY = "PARRY %", BLOCK = "BLOCK %", HASTE = "HASTE %",
-        ["SPELL CRIT"] = "SPELL CRIT %", ["SPELL HIT"] = "SPELL HIT %",
-        ["RANGED CRIT"] = "RANGED CRIT %", ["RANGED HASTE"] = "RANGED HASTE %",
-        ["HOLY CRIT"] = "HOLY CRIT %", AVOIDANCE = "AVOIDANCE %", RESILIENCE = "RESILIENCE %",
-    }
-    return map[stat] or stat
 end
 
 function BuildEditBoxes()
