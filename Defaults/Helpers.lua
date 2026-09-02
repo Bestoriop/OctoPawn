@@ -28,6 +28,11 @@ function OctoPawn_StatLabel(stat)
         ["HOLY CRIT"]    = "HOLY CRIT %",
         AVOIDANCE        = "AVOIDANCE %",
         RESILIENCE       = "RESILIENCE %",
+        ["EXTRA ATTACK"] = "EXTRA ATTACK %",
+        LIFESTEAL        = "LIFESTEAL %",
+        ["CASTING REGEN"] = "CASTING REGEN %",
+        ["MOVEMENT SPEED"] = "MOVEMENT SPEED %",
+        ["MOUNT SPEED"]  = "MOUNT SPEED %",
     }
     return map[stat] or stat
 end

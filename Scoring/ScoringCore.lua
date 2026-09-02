@@ -102,6 +102,12 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                                             local _, _, captured = string.find(line, "([%+%-]?%d+)%s*%%")
                                             if captured then num = tonumber(captured) end
                                         end
+                                        -- Prefer the % chance number on extra-attack proc lines
+                                        -- e.g. "2% chance to get 1 extra attack" → 2, not 1
+                                        if entry.stat == "EXTRA ATTACK" then
+                                            local _, _, pct = string.find(line, "([%+%-]?%d+%.?%d*)%s*%%")
+                                            if pct then num = tonumber(pct) end
+                                        end
                                         if num then
                                             matchedThisLine[entry.stat] = true
                                             totals[entry.stat] = (totals[entry.stat] or 0) + num
@@ -326,39 +332,64 @@ end
 -- True only for gear/item tooltips — blocks spells, abilities, talents, units, etc.
 local function IsItemTooltip(tooltip)
     if not tooltip or not tooltip.NumLines then return false end
-    -- Set* hooks stash the link on real item tooltips
-    if tooltip.itemLink and type(tooltip.itemLink) == "string"
-        and string.find(tooltip.itemLink, "item:") then
-        return true
-    end
 
     local num = tooltip:NumLines()
     if not num or num < 1 then return false end
+
+    local hasEquipSlot = false
+    local hasEquipEvidence = false
+    local isRecipeOrConsume = false
 
     local i
     for i = 1, num do
         local fs = getglobal(tooltip:GetName() .. "TextLeft" .. i)
         if fs then
-            local t = fs:GetText()
-            if t and t ~= "" then
-                if ITEM_SLOT_MARKERS[t] then return true end
-                local u = string.upper(t)
-                -- Classic item-only lines
-                if string.find(u, "SOULBOUND")
-                    or string.find(u, "BINDS WHEN")
-                    or string.find(u, "DURABILITY")
+            local txt = fs:GetText()
+            if txt and txt ~= "" then
+                if ITEM_SLOT_MARKERS[txt] then
+                    hasEquipSlot = true
+                end
+                local u = string.upper(txt)
+                -- Recipes / profession books
+                if string.find(u, "TEACHES YOU HOW")
+                    or string.find(u, "TEACHES YOU TO")
+                    or string.find(u, "^PATTERN:")
+                    or string.find(u, "^PLANS:")
+                    or string.find(u, "^FORMULA:")
+                    or string.find(u, "^SCHEMATIC:")
+                    or string.find(u, "^MANUAL:")
+                    or string.find(u, "^RECIPE:")
+                    or string.find(u, "^DESIGN:")
+                    then
+                    isRecipeOrConsume = true
+                end
+                -- Item class lines that are not gear
+                if u == "CONSUMABLE" or u == "PROJECTILE" or u == "REAGENT"
+                    or u == "TRADE GOODS" or u == "QUEST" or u == "KEY"
+                    or u == "RECIPE" or u == "JUNK"
+                    then
+                    isRecipeOrConsume = true
+                end
+                -- Equippable evidence (not Use: — potions/food/recipes all have Use:)
+                if string.find(u, "DURABILITY")
                     or string.find(u, "^EQUIP:")
                     or string.find(u, "CHANCE ON HIT")
                     or string.find(u, "DAMAGE PER SECOND")
                     or string.find(u, "%d+%s*%-%s*%d+%s+DAMAGE")
-                    or string.find(u, "^USE:")
                     or string.find(u, "UNIQUE%-EQUIPPED")
-                    or string.find(u, "^UNIQUE")
                     then
-                    return true
+                    hasEquipEvidence = true
                 end
             end
         end
+    end
+
+    if isRecipeOrConsume and not hasEquipSlot then
+        return false
+    end
+    -- Equippable gear always has a slot line, durability, weapon DPS, or Equip:
+    if hasEquipSlot or hasEquipEvidence then
+        return true
     end
     return false
 end

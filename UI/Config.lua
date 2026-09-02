@@ -20,6 +20,9 @@ local function StatLabel(stat)
         ["SPELL CRIT"] = "SPELL CRIT %", ["SPELL HIT"] = "SPELL HIT %",
         ["RANGED CRIT"] = "RANGED CRIT %", ["RANGED HASTE"] = "RANGED HASTE %",
         ["HOLY CRIT"] = "HOLY CRIT %", AVOIDANCE = "AVOIDANCE %", RESILIENCE = "RESILIENCE %",
+        ["EXTRA ATTACK"] = "EXTRA ATTACK %",
+        LIFESTEAL = "LIFESTEAL %", ["CASTING REGEN"] = "CASTING REGEN %",
+        ["MOVEMENT SPEED"] = "MOVEMENT SPEED %", ["MOUNT SPEED"] = "MOUNT SPEED %",
     }
     return map[stat] or stat
 end
