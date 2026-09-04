@@ -91,6 +91,21 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                                             or matchedThisLine["ARCANE DAMAGE"] or matchedThisLine["HOLY DAMAGE"] then
                                             skip = true
                                         end
+                                    elseif entry.stat == "ATTACK POWER" then
+                                        -- Feral / ranged / undead AP lines contain "ATTACK POWER" but are not melee AP
+                                        if matchedThisLine["FERAL ATTACK POWER"]
+                                            or matchedThisLine["RANGED ATTACK POWER"]
+                                            or matchedThisLine["ATTACK POWER UNDEAD"]
+                                            or string.find(upper, "FERAL")
+                                            or string.find(upper, "IN CAT")
+                                            or string.find(upper, "IN BEAR")
+                                            or string.find(upper, "MOONKIN")
+                                            or string.find(upper, "RANGED ATTACK POWER")
+                                            or string.find(upper, "VERSUS UNDEAD")
+                                            or string.find(upper, "AGAINST UNDEAD")
+                                            then
+                                            skip = true
+                                        end
                                     end
                                     if not skip then
                                         local num = OctoPawn_ExtractNumberNearStat and OctoPawn_ExtractNumberNearStat(line, upper, entry.pattern)
