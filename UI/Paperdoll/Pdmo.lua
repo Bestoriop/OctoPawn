@@ -10,17 +10,20 @@ local function StripColors(s)
     return s
 end
 
--- True for damage/heal/threat meter tooltips (must not get a unit OP Score)
+local function BaseName(s)
+    s = StripColors(s or "")
+    s = string.gsub(s, "%s*%[.*%]$", "")
+    s = string.gsub(s, " %- .*$", "")
+    return s
+end
+
 local function IsMeterTooltip()
     local i
     for i = 1, 20 do
         local fs = getglobal("GameTooltipTextLeft" .. i)
         if fs then
-            local txt = StripColors(fs:GetText() or "")
-            local u = string.upper(txt)
-            if string.find(u, "STILL ALIVE")
-                or string.find(u, "STILL DEAD")
-                or string.find(u, "^DAMAGE:")
+            local u = string.upper(StripColors(fs:GetText() or ""))
+            if string.find(u, "^DAMAGE:")
                 or string.find(u, "^HEALING:")
                 or string.find(u, "^DPS:")
                 or string.find(u, "^TPS:")
@@ -28,7 +31,6 @@ local function IsMeterTooltip()
                 or string.find(u, "^DURATION:")
                 or string.find(u, "BY SPELL")
                 or string.find(u, "BY TARGET")
-                or string.find(u, "^PET:")
                 then
                 return true
             end
@@ -43,16 +45,13 @@ local function ResolveTooltipUnit()
     end
     local tipName = GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText()
     if not tipName then return nil end
-    tipName = StripColors(tipName)
-    -- "Name [Name]" or "Name - Realm" meter titles should not match a unit
-    if string.find(tipName, "%[") or string.find(tipName, " %- ") then
-        return nil
-    end
+    tipName = BaseName(tipName)
+    if tipName == "" then return nil end
     local function nameMatch(unit)
         if not UnitExists(unit) then return false end
         local n = UnitName(unit)
         local p = UnitPVPName and UnitPVPName(unit)
-        return (n and n == tipName) or (p and p == tipName)
+        return (n and n == tipName) or (p and BaseName(p) == tipName)
     end
     if nameMatch("player") then return "player" end
     if nameMatch("target") then return "target" end
@@ -96,9 +95,18 @@ do
     end)
 end
 
+-- Delay so meter addons can finish writing Damage/DPS lines before we decide
 local opTipWatcher = CreateFrame("Frame", nil, GameTooltip)
 opTipWatcher:SetScript("OnShow", function()
-    pcall(AddUnitOPScoreFromShow)
+    local delay = CreateFrame("Frame")
+    local elapsed = 0
+    delay:SetScript("OnUpdate", function()
+        elapsed = elapsed + arg1
+        if elapsed > 0.08 then
+            delay:SetScript("OnUpdate", nil)
+            pcall(AddUnitOPScoreFromShow)
+        end
+    end)
 end)
 
 print("|cFF00FF00OctoPawn|r paperdoll mouseover loaded")
