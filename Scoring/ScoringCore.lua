@@ -354,6 +354,7 @@ local function IsItemTooltip(tooltip)
     local hasEquipSlot = false
     local hasEquipEvidence = false
     local isRecipeOrConsume = false
+    local isMeterOrUnit = false
 
     local i
     for i = 1, num do
@@ -365,6 +366,21 @@ local function IsItemTooltip(tooltip)
                     hasEquipSlot = true
                 end
                 local u = string.upper(txt)
+                -- Damage/heal/threat meters and unit-style tips
+                if string.find(u, "STILL ALIVE")
+                    or string.find(u, "STILL DEAD")
+                    or string.find(u, "^DAMAGE:")
+                    or string.find(u, "^HEALING:")
+                    or string.find(u, "^DPS:")
+                    or string.find(u, "^TPS:")
+                    or string.find(u, "^THREAT:")
+                    or string.find(u, "^DURATION:")
+                    or string.find(u, "BY SPELL")
+                    or string.find(u, "^PET:")
+                    or string.find(u, "CURRENT MODE")
+                    then
+                    isMeterOrUnit = true
+                end
                 -- Recipes / profession books
                 if string.find(u, "TEACHES YOU HOW")
                     or string.find(u, "TEACHES YOU TO")
@@ -385,12 +401,10 @@ local function IsItemTooltip(tooltip)
                     then
                     isRecipeOrConsume = true
                 end
-                -- Equippable evidence (not Use: — potions/food/recipes all have Use:)
+                -- Equippable evidence that meters never have
                 if string.find(u, "DURABILITY")
                     or string.find(u, "^EQUIP:")
                     or string.find(u, "CHANCE ON HIT")
-                    or string.find(u, "DAMAGE PER SECOND")
-                    or string.find(u, "%d+%s*%-%s*%d+%s+DAMAGE")
                     or string.find(u, "UNIQUE%-EQUIPPED")
                     then
                     hasEquipEvidence = true
@@ -399,10 +413,14 @@ local function IsItemTooltip(tooltip)
         end
     end
 
+    -- Meters/unit tips must never get an OP Score, even if GameTooltip is reused
+    if isMeterOrUnit then
+        return false
+    end
     if isRecipeOrConsume and not hasEquipSlot then
         return false
     end
-    -- Equippable gear always has a slot line, durability, weapon DPS, or Equip:
+    -- Equippable gear: slot line (Head/Finger/Main Hand/…) or Equip:/Durability
     if hasEquipSlot or hasEquipEvidence then
         return true
     end
