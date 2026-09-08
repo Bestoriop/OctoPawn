@@ -1,12 +1,53 @@
 -------------------------------------------------
 -- OctoPawn UI/Paperdoll/Pdmo.lua
 -------------------------------------------------
+local function StripColors(s)
+    if not s then return "" end
+    s = string.gsub(s, "|c%x%x%x%x%x%x%x%x", "")
+    s = string.gsub(s, "|C%x%x%x%x%x%x%x%x", "")
+    s = string.gsub(s, "|r", "")
+    s = string.gsub(s, "|R", "")
+    return s
+end
+
+-- True for damage/heal/threat meter tooltips (must not get a unit OP Score)
+local function IsMeterTooltip()
+    local i
+    for i = 1, 20 do
+        local fs = getglobal("GameTooltipTextLeft" .. i)
+        if fs then
+            local txt = StripColors(fs:GetText() or "")
+            local u = string.upper(txt)
+            if string.find(u, "STILL ALIVE")
+                or string.find(u, "STILL DEAD")
+                or string.find(u, "^DAMAGE:")
+                or string.find(u, "^HEALING:")
+                or string.find(u, "^DPS:")
+                or string.find(u, "^TPS:")
+                or string.find(u, "^THREAT:")
+                or string.find(u, "^DURATION:")
+                or string.find(u, "BY SPELL")
+                or string.find(u, "BY TARGET")
+                or string.find(u, "^PET:")
+                then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 local function ResolveTooltipUnit()
     if UnitExists("mouseover") and UnitIsPlayer("mouseover") then
         return "mouseover"
     end
     local tipName = GameTooltipTextLeft1 and GameTooltipTextLeft1:GetText()
     if not tipName then return nil end
+    tipName = StripColors(tipName)
+    -- "Name [Name]" or "Name - Realm" meter titles should not match a unit
+    if string.find(tipName, "%[") or string.find(tipName, " %- ") then
+        return nil
+    end
     local function nameMatch(unit)
         if not UnitExists(unit) then return false end
         local n = UnitName(unit)
@@ -27,6 +68,7 @@ end
 
 local function AddUnitOPScoreFromShow()
     if GameTooltip.octoPawnUnitScored then return end
+    if IsMeterTooltip() then return end
     local unit = ResolveTooltipUnit()
     if not unit or not UnitIsPlayer(unit) then return end
 
