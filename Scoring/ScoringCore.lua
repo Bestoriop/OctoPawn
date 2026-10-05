@@ -83,8 +83,20 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                                     elseif isChanceOnHit and (entry.stat == "HIT" or entry.stat == "CRIT"
                                         or entry.stat == "STRENGTH" or entry.stat == "AGILITY"
                                         or entry.stat == "STAMINA" or entry.stat == "INTELLECT"
-                                        or entry.stat == "SPIRIT" or entry.stat == "ARMOR") then
+                                        or entry.stat == "SPIRIT" or entry.stat == "ARMOR"
+                                        or entry.stat == "ARMOR BONUS") then
                                         skip = true
+                                    elseif entry.stat == "ARMOR" or entry.stat == "ARMOR BONUS" then
+                                        -- Armure de base : ligne blanche "123 Armor" (nombre puis Armor, rien d'autre)
+                                        -- Bonus : toute autre ligne avec ARMOR (ex. "Reinforced Armor +32", "+32 Armor")
+                                        local isBaseArmor = string.find(upper, "^%s*%d+%s+ARMOR%s*$") ~= nil
+                                        if string.find(upper, "PENETRATION") or string.find(upper, "IGNORE") then
+                                            skip = true
+                                        elseif entry.stat == "ARMOR" and not isBaseArmor then
+                                            skip = true
+                                        elseif entry.stat == "ARMOR BONUS" and isBaseArmor then
+                                            skip = true
+                                        end
                                     elseif (entry.stat == "SPELL DAMAGE" or entry.stat == "SPELL POWER") then
                                         if matchedThisLine["NATURE DAMAGE"] or matchedThisLine["FIRE DAMAGE"]
                                             or matchedThisLine["FROST DAMAGE"] or matchedThisLine["SHADOW DAMAGE"]
@@ -139,7 +151,12 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
     local results = {}
     local totalScore = 0
     for stat, value in pairs(totals) do
-        local weight = weights[stat] or 1.0
+        local weight = weights[stat]
+        -- Sans poids dédié, le bonus d'armure hérite du poids de l'armure
+        if weight == nil and stat == "ARMOR BONUS" then
+            weight = weights["ARMOR"]
+        end
+        if weight == nil then weight = 1.0 end
         local effective = EffectiveValue(stat, value)
         local contribution = effective * weight
         totalScore = totalScore + contribution
@@ -153,6 +170,7 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
     end
     return totalScore, results
 end
+
 
 local function GetScanTooltip()
     if not OctoPawnScanTooltip then
