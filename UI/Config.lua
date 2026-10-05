@@ -510,11 +510,28 @@ function BuildEditBoxes()
     local role = (OctoPawnDB and OctoPawnDB.role) or "Default"
     local suffix = (OctoPawnDB and OctoPawnDB.useCustom) and " (custom)" or ""
     title:SetText("OctoPawn - " .. playerClass .. " (" .. role .. suffix .. ")")
+    local saved = (OctoPawnDB and OctoPawnDB.weights) or {}
+    local defaults = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
+    local allStats = {}
+    for stat in pairs(defaults) do allStats[stat] = true end
+    for stat in pairs(saved) do allStats[stat] = true end
+    -- Le bonus d'armure doit toujours pouvoir être réglé à la main
+    allStats["ARMOR BONUS"] = true
+    -- Valeur affichée pour chaque stat (ARMOR BONUS part du poids d'ARMOR tant qu'il n'a pas le sien)
+    local vals = {}
+    for stat in pairs(allStats) do
+        local v = saved[stat]
+        if v == nil then v = defaults[stat] end
+        if v == nil and stat == "ARMOR BONUS" then
+            v = saved["ARMOR"]
+            if v == nil then v = defaults["ARMOR"] end
+        end
+        if v == nil then v = 1.0 end
+        vals[stat] = v
+    end
     if next(editBoxes) ~= nil then
-        local saved = (OctoPawnDB and OctoPawnDB.weights) or {}
-        local defaults = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
         for stat, box in pairs(editBoxes) do
-            local value = saved[stat]; if value == nil then value = defaults[stat] or 1.0 end
+            local value = vals[stat]; if value == nil then value = 1.0 end
             box:SetText(tostring(value))
             if box.opLabel then box.opLabel:SetText(StatLabel(stat)) end
         end
@@ -523,22 +540,17 @@ function BuildEditBoxes()
         SyncCompactCheck()
         return
     end
-    local saved = (OctoPawnDB and OctoPawnDB.weights) or {}
-    local defaults = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
-    local allStats = {}
-    for stat in pairs(defaults) do allStats[stat] = true end
-    for stat in pairs(saved) do allStats[stat] = true end
     local sortedStats = {}
     for stat in pairs(allStats) do table.insert(sortedStats, stat) end
     table.sort(sortedStats, function(a, b)
-        local va = saved[a]; if va == nil then va = defaults[a] or 0 end
-        local vb = saved[b]; if vb == nil then vb = defaults[b] or 0 end
+        local va = vals[a]
+        local vb = vals[b]
         if va ~= vb then return va > vb end
         return a < b
     end)
     local y = -10
     for _, stat in ipairs(sortedStats) do
-        local value = saved[stat]; if value == nil then value = defaults[stat] or 1.0 end
+        local value = vals[stat]
         local box = CreateFrame("EditBox", nil, scrollChild)
         box:SetWidth(70); box:SetHeight(20); box:SetAutoFocus(false)
         box:SetFontObject("GameFontHighlight"); box:SetText(tostring(value)); box:SetJustifyH("CENTER")
