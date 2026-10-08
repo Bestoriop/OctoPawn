@@ -183,7 +183,7 @@ end)
 -------------------------------------------------
 allSpecsCheck = CreateFrame("CheckButton", "OctoPawnAllSpecsCheck", configFrame, "UICheckButtonTemplate")
 allSpecsCheck:SetWidth(24); allSpecsCheck:SetHeight(24)
-allSpecsCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -100, -252)
+allSpecsCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -252)
 allSpecsCheck:SetScript("OnClick", function()
     if not OctoPawnDB then OctoPawnDB = {} end
     OctoPawnDB.showAllSpecs = this:GetChecked() and true or false
@@ -206,7 +206,7 @@ end
 -------------------------------------------------
 local compactCheck = CreateFrame("CheckButton", "OctoPawnCompactCheck", configFrame, "UICheckButtonTemplate")
 compactCheck:SetWidth(24); compactCheck:SetHeight(24)
-compactCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -100, -276)
+compactCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -276)
 compactCheck:SetScript("OnClick", function()
     if not OctoPawnDB then OctoPawnDB = {} end
     OctoPawnDB.compactTooltips = this:GetChecked() and true or false
