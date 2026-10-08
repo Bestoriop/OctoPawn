@@ -156,4 +156,48 @@ function OctoPawn_IsSetBonusLine(upper)
     return false
 end
 
+-------------------------------------------------
+-- Detection des enchants (option "Ignore enchants")
+-------------------------------------------------
+-- Motifs (MAJUSCULES, motifs Lua) TOUJOURS consideres comme un enchant,
+-- quelle que soit la couleur de la ligne. A alimenter au fur et a mesure.
+OctoPawn_EnchantPatterns = {
+    -- "^CRUSADER",
+}
+
+-- Motifs JAMAIS consideres comme un enchant (garde-fou si une ligne verte
+-- legitime est exclue a tort). A alimenter au fur et a mesure.
+OctoPawn_EnchantExceptions = {
+}
+
+local function StripColorCodes(upper)
+    local s = string.gsub(upper, "|C%x%x%x%x%x%x%x%x", "")
+    s = string.gsub(s, "|R", "")
+    return s
+end
+
+-- upper : texte de la ligne en majuscules ; r, g, b : couleur de la ligne
+function OctoPawn_IsEnchantLine(upper, r, g, b)
+    if not upper then return false end
+    local text = StripColorCodes(upper)
+    local i
+    for i = 1, table.getn(OctoPawn_EnchantExceptions) do
+        if string.find(text, OctoPawn_EnchantExceptions[i]) then return false end
+    end
+    for i = 1, table.getn(OctoPawn_EnchantPatterns) do
+        if string.find(text, OctoPawn_EnchantPatterns[i]) then return true end
+    end
+    -- Heuristique : ligne verte qui n'est ni un effet Equip / Use / Chance on hit,
+    -- ni un bonus de set
+    if r and g and b and r < 0.35 and g > 0.8 and b < 0.35 then
+        if string.find(text, "^%s*EQUIP%s*:") or string.find(text, "^%s*USE%s*:")
+            or string.find(text, "^%s*CHANCE ON HIT") then
+            return false
+        end
+        if OctoPawn_IsSetBonusLine and OctoPawn_IsSetBonusLine(text) then return false end
+        return true
+    end
+    return false
+end
+
 print("|cFF00FF00OctoPawn|r scoring stats loaded")
