@@ -58,6 +58,7 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
     local patterns = OctoPawn_StatPatterns or {}
     local totals = {}
     local pastDPS = false
+    local ignoreEnchants = OctoPawnDB and OctoPawnDB.ignoreEnchants
     local numLines = tooltip:NumLines()
     local i
     for i = 1, numLines do
@@ -67,7 +68,14 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
             if line then
                 local upper = string.upper(line)
                 local isChanceOnHit = string.find(upper, "CHANCE ON HIT") ~= nil
-                if not (OctoPawn_IsSetBonusLine and OctoPawn_IsSetBonusLine(upper)) then
+                -- Option "Ignore enchants" : on saute les lignes d'enchant
+                -- (la ligne 1 est le nom de l'objet, vert sur les objets inhabituels)
+                local isEnchant = false
+                if ignoreEnchants and i > 1 and OctoPawn_IsEnchantLine then
+                    local r, g, b = lineObj:GetTextColor()
+                    isEnchant = OctoPawn_IsEnchantLine(upper, r, g, b)
+                end
+                if not isEnchant and not (OctoPawn_IsSetBonusLine and OctoPawn_IsSetBonusLine(upper)) then
                     if string.find(upper, "DAMAGE PER SECOND") or string.find(upper, "DPS") then pastDPS = true end
                     if pastDPS or not string.find(upper, "DAMAGE") or string.find(upper, "PER SECOND") or string.find(upper, "SPELLS") then
                         if not string.find(upper, "REQUIRES") and not string.find(upper, "SOULBOUND") and
