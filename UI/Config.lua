@@ -224,6 +224,32 @@ local function SyncCompactCheck()
     end
 end
 
+-------------------------------------------------
+-- Ignore enchants checkbox (off by default)
+-------------------------------------------------
+local ignoreEnchantsCheck = CreateFrame("CheckButton", "OctoPawnIgnoreEnchantsCheck", configFrame, "UICheckButtonTemplate")
+ignoreEnchantsCheck:SetWidth(24); ignoreEnchantsCheck:SetHeight(24)
+ignoreEnchantsCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -300)
+ignoreEnchantsCheck:SetScript("OnClick", function()
+    if not OctoPawnDB then OctoPawnDB = {} end
+    OctoPawnDB.ignoreEnchants = this:GetChecked() and true or false
+end)
+local ignoreEnchantsLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+ignoreEnchantsLabel:SetPoint("RIGHT", ignoreEnchantsCheck, "LEFT", -2, 0)
+ignoreEnchantsLabel:SetText("Ignore enchants")
+
+local function SyncIgnoreEnchantsCheck()
+    if not ignoreEnchantsCheck then return end
+    if OctoPawnDB and OctoPawnDB.ignoreEnchants then
+        ignoreEnchantsCheck:SetChecked(1)
+    else
+        ignoreEnchantsCheck:SetChecked(0)
+    end
+end
+-- Se resynchronise a chaque ouverture de la fenetre (la case est enfant de configFrame)
+ignoreEnchantsCheck:SetScript("OnShow", SyncIgnoreEnchantsCheck)
+
+
 function OctoPawn_RefreshCompareButton() UpdateCompareButtonText() end
 
 -------------------------------------------------
