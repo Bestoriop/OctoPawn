@@ -30,6 +30,9 @@ You can also open the full config window from the minimap button.
 
 ![OctoPawn](Screenshots/OctoPawnScreen.png)
 
+<img width="495" height="597" alt="image" src="https://github.com/user-attachments/assets/efa4605e-4344-423e-bd39-dc9410ac0181" />
+
+
 ### Installation
 
 1. Place the `OctoPawn` folder into your `Interface/AddOns` directory.
