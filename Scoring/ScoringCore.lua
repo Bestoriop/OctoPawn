@@ -77,7 +77,7 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                 end
                 if not isEnchant and not (OctoPawn_IsSetBonusLine and OctoPawn_IsSetBonusLine(upper)) then
                     if string.find(upper, "DAMAGE PER SECOND") or string.find(upper, "DPS") then pastDPS = true end
-                    if pastDPS or not string.find(upper, "DAMAGE") or string.find(upper, "PER SECOND") or string.find(upper, "SPELLS") then
+                    if pastDPS or not string.find(upper, "DAMAGE") or string.find(upper, "PER SECOND") or string.find(upper, "SPELLS") or string.find(upper, "SPELL DAMAGE") then
                         if not string.find(upper, "REQUIRES") and not string.find(upper, "SOULBOUND") and
                            not string.find(upper, "UNIQUE") and not string.find(upper, "LEVEL") and
                            not string.find(upper, "BIND") and not string.find(upper, "MADE BY") then
@@ -108,7 +108,8 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                                     elseif (entry.stat == "SPELL DAMAGE" or entry.stat == "SPELL POWER") then
                                         if matchedThisLine["NATURE DAMAGE"] or matchedThisLine["FIRE DAMAGE"]
                                             or matchedThisLine["FROST DAMAGE"] or matchedThisLine["SHADOW DAMAGE"]
-                                            or matchedThisLine["ARCANE DAMAGE"] or matchedThisLine["HOLY DAMAGE"] then
+                                            or matchedThisLine["ARCANE DAMAGE"] or matchedThisLine["HOLY DAMAGE"]
+                                            or (entry.stat == "SPELL DAMAGE" and matchedThisLine["SPELL POWER"]) then
                                             skip = true
                                         end
                                     elseif entry.stat == "ATTACK POWER" then
