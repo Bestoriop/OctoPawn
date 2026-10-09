@@ -97,6 +97,7 @@ OctoPawn_StatPatterns = {
     { pattern = "REGENERATION TO CONTINUE WHILE CASTING",     stat = "CASTING REGEN" },
     { pattern = "CONTINUE WHILE CASTING",                     stat = "CASTING REGEN" },
     { pattern = "WHILE CASTING",                              stat = "CASTING REGEN" },
+    { pattern = "^%s*HP%s*%+",           stat = "HEALTH" },  -- enchant : "HP +100"
     { pattern = "INCREASES HEALTH",      stat = "HEALTH" },
     { pattern = "HEALTH",                stat = "HEALTH" },
     { pattern = "INCREASES MANA",        stat = "MANA" },
