@@ -4,6 +4,7 @@
 OctoPawn_StatPatterns = {
     { pattern = "DAMAGE AND HEALING DONE BY MAGICAL SPELLS", stat = "SPELL POWER" },
     { pattern = "DAMAGE AND HEALING DONE BY SPELLS",         stat = "SPELL POWER" },
+    { pattern = "^%s*%+?%d+%s+DAMAGE AND HEALING SPELLS",     stat = "SPELL POWER" },  -- enchant : "+9 Damage and Healing Spells"
     { pattern = "DAMAGE DONE BY SHADOW SPELLS",  stat = "SHADOW DAMAGE" },
     { pattern = "DAMAGE DONE BY FIRE SPELLS",    stat = "FIRE DAMAGE" },
     { pattern = "DAMAGE DONE BY FROST SPELLS",   stat = "FROST DAMAGE" },
@@ -39,6 +40,8 @@ OctoPawn_StatPatterns = {
     { pattern = "ATTACK AND CASTING SPEED",                stat = "HASTE" },
     { pattern = "INCREASES YOUR ATTACK SPEED",             stat = "HASTE" },
     { pattern = "INCREASES YOUR CASTING SPEED",            stat = "HASTE" },
+    { pattern = "^%s*%+?%d+%.?%d*%%%s*HASTE",              stat = "HASTE" },  -- enchant : "+1% Haste"
+    { pattern = "^%s*HASTE%s*%+",                          stat = "HASTE" },  -- enchant : "Haste +1%"
     { pattern = "CHANCE TO GRANT .* EXTRA ATTACK",         stat = "EXTRA ATTACK" },
     { pattern = "CHANCE TO GET .* EXTRA ATTACK",           stat = "EXTRA ATTACK" },
     { pattern = "CHANCE ON HIT TO GRANT .* EXTRA ATTACK",  stat = "EXTRA ATTACK" },
