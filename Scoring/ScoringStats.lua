@@ -24,6 +24,7 @@ OctoPawn_StatPatterns = {
     { pattern = "HOLY DAMAGE",          stat = "HOLY DAMAGE" },
     { pattern = "INCREASES HEALING DONE",        stat = "HEALING" },
     { pattern = "HEALING DONE BY SPELLS",        stat = "HEALING" },
+    { pattern = "HEALING SPELLS %+",             stat = "HEALING" },  -- enchant : "Healing Spells +55"
     { pattern = "DAMAGE DEALT IS RETURNED AS HEALING", stat = "LIFESTEAL" },
     { pattern = "RETURNED AS HEALING",                 stat = "LIFESTEAL" },
     { pattern = "VAMPIRISM",                           stat = "LIFESTEAL" },
