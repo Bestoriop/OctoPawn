@@ -42,6 +42,7 @@ OctoPawn_StatPatterns = {
     { pattern = "INCREASES YOUR CASTING SPEED",            stat = "HASTE" },
     { pattern = "^%s*%+?%d+%.?%d*%%%s*HASTE",              stat = "HASTE" },  -- enchant : "+1% Haste"
     { pattern = "^%s*HASTE%s*%+",                          stat = "HASTE" },  -- enchant : "Haste +1%"
+    { pattern = "^%s*ATTACK SPEED%s*%+",                    stat = "HASTE" },  -- enchant : "Attack Speed +1%"
     { pattern = "CHANCE TO GRANT .* EXTRA ATTACK",         stat = "EXTRA ATTACK" },
     { pattern = "CHANCE TO GET .* EXTRA ATTACK",           stat = "EXTRA ATTACK" },
     { pattern = "CHANCE ON HIT TO GRANT .* EXTRA ATTACK",  stat = "EXTRA ATTACK" },
