@@ -132,7 +132,7 @@ function OctoPawn_RenameCustomSpec(oldName, newName)
     end
     local class = OctoPawn_GetClass and OctoPawn_GetClass()
     if OctoPawn_IsBuiltInRole(class, newName) then
-        return false, "Name conflicts with a built-in role"
+        return false, "Name conflicts with a built-in profile"
     end
     if OctoPawnDB.customWeights[newName] then
         return false, "A profile named " .. newName .. " already exists"
@@ -207,7 +207,7 @@ function OctoPawn_ApplyRole(role, isCustom)
     local hasCustom = OctoPawnDB and OctoPawnDB.customWeights and OctoPawnDB.customWeights[role]
     -- Pure custom profile (e.g. "PVP") has no built-in source
     if not source and not hasCustom then
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: Unknown role " .. tostring(role) .. "|r")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: Unknown profile " .. tostring(role) .. "|r")
         return
     end
     if not OctoPawnDB then OctoPawnDB = {} end
@@ -245,7 +245,7 @@ end
 
 -------------------------------------------------
 -- Sparse import / export (OPW1)
--- OPW1:CLASS:ROLE:*STAT:val|STAT:val
+-- OPW1:CLASS:PROFILE:*STAT:val|STAT:val
 -------------------------------------------------
 local function TrimNum(n)
     local s = string.format("%.4f", n)
@@ -258,7 +258,7 @@ function OctoPawn_ExportWeightsSparse()
     local class = OctoPawn_GetClass()
     local role = OctoPawnDB and OctoPawnDB.role
     if not class or not role then
-        return nil, "No active role"
+        return nil, "No active profile"
     end
     local classTable = defaultWeights and defaultWeights[class]
     local base = (classTable and classTable[role]) or {}
@@ -289,10 +289,10 @@ function OctoPawn_ImportWeightsSparse(str)
     end
     str = string.gsub(str, "^%s+", "")
     str = string.gsub(str, "%s+$", "")
-    -- OPW1:CLASS:ROLE:*STAT:val|STAT:val
+    -- OPW1:CLASS:PROFILE:*STAT:val|STAT:val
     local _, _, ver, class, role, rest = string.find(str, "^(OPW%d+):([%w_]+):([%w_]+):(.*)$")
     if not ver or not class or not role then
-        return false, "Invalid format (need OPW1:CLASS:ROLE:*...)"
+        return false, "Invalid format (need OPW1:CLASS:PROFILE:*...)"
     end
     if string.sub(rest, 1, 1) ~= "*" then
         return false, "Only sparse (*) format supported"
@@ -301,13 +301,13 @@ function OctoPawn_ImportWeightsSparse(str)
     local playerClass = OctoPawn_GetClass()
     if class ~= playerClass then
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFF9900OctoPawn: Import class is " .. class
-            .. ", you are " .. tostring(playerClass) .. " — applying to current role weights anyway.|r")
+            .. ", you are " .. tostring(playerClass) .. " — applying to current profile weights anyway.|r")
     end
     local classTable = defaultWeights and defaultWeights[playerClass]
     if not classTable or not classTable[role] then
-        -- try imported class table for role existence
+        -- try imported class table for profile existence
         if not (defaultWeights and defaultWeights[class] and defaultWeights[class][role]) then
-            return false, "Unknown role: " .. tostring(role)
+            return false, "Unknown profile: " .. tostring(role)
         end
     end
     local base = {}
