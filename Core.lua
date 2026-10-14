@@ -360,7 +360,6 @@ initFrame:SetScript("OnEvent", function()
         if type(OctoPawnDB.dr) ~= "table" then OctoPawnDB.dr = {} end
         if type(OctoPawnDB.defaultOverrides) ~= "table" then OctoPawnDB.defaultOverrides = {} end
         if type(OctoPawnDB.tipSpecs) ~= "table" then OctoPawnDB.tipSpecs = {} end
-        if OctoPawnDB.showAllSpecs == nil then OctoPawnDB.showAllSpecs = false end
         if OctoPawnDB.compactTooltips == nil then OctoPawnDB.compactTooltips = false end
         -- One-time migration: old "all specs on tips" → tipSpecs for every known role
         if OctoPawnDB.showAllSpecs and not OctoPawnDB.tipSpecsMigrated then
@@ -403,3 +402,4 @@ initFrame:SetScript("OnEvent", function()
 end)
 
 print("|cFF00FF00OctoPawn|r core loaded")
+
