@@ -168,22 +168,13 @@ compareBtn = MakeCmdButton("Compare: ON", -88, function()
     end
     UpdateCompareButtonText()
 end)
-MakeCmdButton("Reset", -121, function()
-    if not OctoPawnDB then OctoPawnDB = {} end
-    OctoPawnDB.weights = {}
-    OctoPawnDB.role = nil
-    OctoPawnDB.useCustom = false
-    if OctoPawn_WipeConfigUI then OctoPawn_WipeConfigUI() end
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Weights cleared. Choose a role.|r")
-    if OctoPawn_ShowRolePicker then OctoPawn_ShowRolePicker() end
-end)
-MakeCmdButton("Help", -154, function()
+MakeCmdButton("Help", -121, function()
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: /op /op compare /op spec /op reset /op help|r")
 end)
-MakeCmdButton("Soft Caps", -187, function()
+MakeCmdButton("Soft Caps", -154, function()
     if ToggleAdvancedFrame then ToggleAdvancedFrame() end
 end)
-MakeCmdButton("Share", -220, function()
+MakeCmdButton("Share", -187, function()
     if ToggleShareFrame then ToggleShareFrame() end
 end)
 
@@ -815,9 +806,9 @@ function OctoPawn_ShowRolePicker()
 
             if isPureCustom then
                 local ren = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-                ren:SetWidth(40); ren:SetHeight(24)
+                ren:SetWidth(58); ren:SetHeight(24)
                 ren:SetPoint("LEFT", del, "RIGHT", 2, 0)
-                ren:SetText("Ren")
+                ren:SetText("Rename")
                 ren.roleName = role
                 ren:SetScript("OnClick", function()
                     if rolePickerFrame.renameBox then
@@ -829,8 +820,8 @@ function OctoPawn_ShowRolePicker()
                 end)
                 Track(ren)
             end
-        end
-
+	end
+	
         y = y - 30
         buttonCount = buttonCount + 1
 
