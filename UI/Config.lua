@@ -71,7 +71,7 @@ local function CreateMinimapButton()
         GameTooltip:SetOwner(this, "ANCHOR_LEFT")
         GameTooltip:AddLine("OctoPawn", 0, 1, 0)
         local role = (OctoPawnDB and OctoPawnDB.role) or "none"
-        GameTooltip:AddLine("Role: " .. role, 0.8, 0.8, 0.8)
+        GameTooltip:AddLine("Profile: " .. role, 0.8, 0.8, 0.8)
         GameTooltip:AddLine("Left-click: Open config", 0.5, 0.5, 0.5)
         GameTooltip:Show()
     end)
@@ -154,7 +154,7 @@ local function MakeCmdButton(label, yOffset, onClick)
     return b
 end
 
-MakeCmdButton("Spec", -55, function()
+MakeCmdButton("Profiles", -55, function()
     OctoPawn_ShowRolePicker()
 end)
 compareBtn = MakeCmdButton("Compare: ON", -88, function()
@@ -169,7 +169,7 @@ compareBtn = MakeCmdButton("Compare: ON", -88, function()
     UpdateCompareButtonText()
 end)
 MakeCmdButton("Help", -121, function()
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: /op /op compare /op spec /op reset /op help|r")
+    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: /op /op compare /op profile /op reset /op help|r")
 end)
 MakeCmdButton("Soft Caps", -154, function()
     if ToggleAdvancedFrame then ToggleAdvancedFrame() end
@@ -190,7 +190,7 @@ allSpecsCheck:SetScript("OnClick", function()
 end)
 local allSpecsLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
 allSpecsLabel:SetPoint("RIGHT", allSpecsCheck, "LEFT", -2, 0)
-allSpecsLabel:SetText("All specs on tips")
+allSpecsLabel:SetText("All profiles on tip")
 
 local function SyncAllSpecsCheck()
     if not allSpecsCheck then return end
@@ -282,7 +282,7 @@ local function EnsureShareFrame()
 
     local hint = shareFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
     hint:SetPoint("TOP", st, "BOTTOM", 0, -4)
-    hint:SetText("Sparse export — only stats that differ from role defaults")
+    hint:SetText("Sparse export — only stats that differ from profile defaults")
 
     local box = CreateFrame("EditBox", "OctoPawnShareEditBox", shareFrame)
     box:SetPoint("TOPLEFT", shareFrame, "TOPLEFT", 20, -50)
@@ -649,7 +649,7 @@ clearBtn:SetPoint("RIGHT", saveBtn, "LEFT", -10, 0)
 clearBtn:SetWidth(110); clearBtn:SetHeight(28); clearBtn:SetText("Clear Weights")
 clearBtn:SetScript("OnClick", function()
     for stat, box in pairs(editBoxes) do box:SetText("0") end
-    DEFAULT_CHAT_FRAME:AddMessage("|cFFFF9900OctoPawn: All weights set to 0 - click Save Weights to apply (Reset restores the defaults).|r")
+    DEFAULT_CHAT_FRAME:AddMessage("|cFFFF9900OctoPawn: All weights set to 0 - click Save Weights to apply (use Profiles to reload a profile's default weights).|r")
 end)
 
 function ToggleConfigFrame()
@@ -677,12 +677,12 @@ function OctoPawn_ShowRolePicker()
         rolePickerFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
         local pickerTitle = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
         pickerTitle:SetPoint("TOP", rolePickerFrame, "TOP", 0, -14)
-        pickerTitle:SetText("Choose Role")
+        pickerTitle:SetText("Choose Profile")
         rolePickerFrame.title = pickerTitle
         local hint = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
         hint:SetPoint("TOP", pickerTitle, "BOTTOM", 0, -4)
         hint:SetTextColor(0.7, 0.7, 0.7)
-        hint:SetText("Tip = show this spec on item tooltips")
+        hint:SetText("Tip = show this profile on item tooltips")
         rolePickerFrame.hint = hint
         rolePickerFrame.buttons = {}
     end
@@ -765,7 +765,7 @@ function OctoPawn_ShowRolePicker()
         tip:SetScript("OnEnter", function()
             GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
             GameTooltip:SetText("Show on tip", 1, 1, 1)
-            GameTooltip:AddLine("Include this spec on item tooltips", 0.7, 0.7, 0.7, 1)
+            GameTooltip:AddLine("Include this profile on item tooltips", 0.7, 0.7, 0.7, 1)
             GameTooltip:Show()
         end)
         tip:SetScript("OnLeave", function() GameTooltip:Hide() end)
@@ -795,7 +795,7 @@ function OctoPawn_ShowRolePicker()
                 GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
                 GameTooltip:SetText("Delete custom", 1, 0.3, 0.3)
                 if isBuiltIn then
-                    GameTooltip:AddLine("Removes saved custom weights for this role", 0.7, 0.7, 0.7, 1)
+                    GameTooltip:AddLine("Removes saved custom weights for this profile", 0.7, 0.7, 0.7, 1)
                 else
                     GameTooltip:AddLine("Deletes this custom profile entirely", 0.7, 0.7, 0.7, 1)
                 end
