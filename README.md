@@ -23,7 +23,6 @@ OctoPawn reads the stats on gear and gives you a clear **OP Score** so you can q
 |`/op`|Score the currently hovered item (+ equipped compare)|
 |`/op compare`|Toggle the equip comparison on/off|
 |`/op profile`|Open the profile picker|
-|`/op reset`|Reset weights back to the current profile’s defaults|
 |`/op help`|Show this help|
 
 You can also open the full config window from the minimap button.
