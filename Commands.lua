@@ -9,7 +9,6 @@ SlashCmdList["OCTOPAWN"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op|r - Score the hovered item only")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op compare|r - Toggle equip compare")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op profile|r - Profile picker")
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op reset|r - Reset weights to profile defaults")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op help|r - This help")
         return
     end
@@ -27,19 +26,6 @@ SlashCmdList["OCTOPAWN"] = function(msg)
     end
     if msg == "profile" or msg == "profiles" or msg == "spec" then
         if OctoPawn_ShowRolePicker then OctoPawn_ShowRolePicker() end
-        return
-    end
-    if msg == "reset" then
-        local role = OctoPawnDB and OctoPawnDB.role
-        if role and OctoPawn_ApplyRole then
-            OctoPawn_ApplyRole(role, false)
-        else
-            local defaults = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
-            if not OctoPawnDB then OctoPawnDB = {} end
-            OctoPawnDB.weights = {}
-            for stat, value in pairs(defaults) do OctoPawnDB.weights[stat] = value end
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Weights reset to defaults.|r")
-        end
         return
     end
     -- Prefer any visible tooltip that already has (or can produce) an OP Score
@@ -63,3 +49,4 @@ SlashCmdList["OCTOPAWN"] = function(msg)
     OctoPawn_PrintBreakdown(name, score, results)
 end
 print("|cFF00FF00OctoPawn|r commands loaded")
+
