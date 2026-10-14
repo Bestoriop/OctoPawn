@@ -127,6 +127,15 @@ scrollChild = CreateFrame("Frame", nil, scrollFrame)
 scrollChild:SetWidth(250); scrollChild:SetHeight(1600)
 scrollFrame:SetScrollChild(scrollChild)
 
+-- Décale la barre de défilement vers la gauche (elle collait les boutons de droite)
+local scrollBar = getglobal("OctoPawnScrollFrameScrollBar")
+if scrollBar then
+    scrollBar:ClearAllPoints()
+    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -4, -16)
+    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -4, 16)
+end
+
+
 local function UpdateCompareButtonText()
     if not compareBtn then return end
     if OctoPawnDB and OctoPawnDB.compareEnabled == false then
@@ -171,7 +180,7 @@ end)
 MakeCmdButton("Help", -154, function()
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: /op /op compare /op spec /op reset /op help|r")
 end)
-MakeCmdButton("Advanced", -187, function()
+MakeCmdButton("Soft Caps", -187, function()
     if ToggleAdvancedFrame then ToggleAdvancedFrame() end
 end)
 MakeCmdButton("Share", -220, function()
@@ -513,18 +522,28 @@ function OctoPawn_WipeConfigUI()
     if configFrame and configFrame:IsShown() then configFrame:Hide() end
 end
 
+-- Lit le poids saisi : un champ vide (ou invalide) vaut 0 et est réécrit "0" dans la case
+local function ReadWeightBox(box)
+    local val = tonumber(box:GetText())
+    if val == nil then
+        val = 0
+        box:SetText("0")
+    end
+    return val
+end
+
 local function SaveWeights()
     if not OctoPawnDB then OctoPawnDB = {} end
     if not OctoPawnDB.weights then OctoPawnDB.weights = {} end
     if not OctoPawnDB.customWeights then OctoPawnDB.customWeights = {} end
     local role = OctoPawnDB.role
     if not role then
-        for stat, box in pairs(editBoxes) do OctoPawnDB.weights[stat] = tonumber(box:GetText()) or 1.0 end
+        for stat, box in pairs(editBoxes) do OctoPawnDB.weights[stat] = ReadWeightBox(box) end
         return
     end
     OctoPawnDB.customWeights[role] = {}
     for stat, box in pairs(editBoxes) do
-        local val = tonumber(box:GetText()) or 1.0
+        local val = ReadWeightBox(box)
         OctoPawnDB.weights[stat] = val
         OctoPawnDB.customWeights[role][stat] = val
     end
@@ -633,6 +652,14 @@ saveBtn:SetScript("OnClick", function()
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Saved as " .. role .. " (custom).|r")
 end)
 configFrame:SetScript("OnHide", function() SaveWeights() end)
+
+local clearBtn = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
+clearBtn:SetPoint("RIGHT", saveBtn, "LEFT", -10, 0)
+clearBtn:SetWidth(110); clearBtn:SetHeight(28); clearBtn:SetText("Clear Weights")
+clearBtn:SetScript("OnClick", function()
+    for stat, box in pairs(editBoxes) do box:SetText("0") end
+    DEFAULT_CHAT_FRAME:AddMessage("|cFFFF9900OctoPawn: All weights set to 0 - click Save Weights to apply (Reset restores the defaults).|r")
+end)
 
 function ToggleConfigFrame()
     if configFrame:IsShown() then configFrame:Hide()
