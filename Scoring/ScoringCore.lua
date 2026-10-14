@@ -300,18 +300,11 @@ local function AddAllSpecsToTooltip(tooltip)
     local currentRole = OctoPawnDB and OctoPawnDB.role
     local slots = OctoPawn_GetCompareSlotsFromTooltip and OctoPawn_GetCompareSlotsFromTooltip(tooltip)
     local compareOn = not (OctoPawnDB and OctoPawnDB.compareEnabled == false)
-    local useTipFilter = OctoPawn_AnyTipSpecsEnabled and OctoPawn_AnyTipSpecsEnabled()
-    local legacyAll = OctoPawnDB and OctoPawnDB.showAllSpecs and not useTipFilter
 
     local ri
     for ri = 1, table.getn(roles) do
         local role = roles[ri]
-        local show = false
-        if useTipFilter then
-            show = OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role)
-        elseif legacyAll then
-            show = true
-        end
+        local show = OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role)
         if show then
             local weights = OctoPawn_GetWeightsForRole and OctoPawn_GetWeightsForRole(class, role) or {}
             local score = OctoPawn_ScoreTooltip(tooltip, weights) or 0
@@ -338,6 +331,7 @@ local function AddAllSpecsToTooltip(tooltip)
         end
     end
 end
+
 
 -- Last tooltip that successfully received an OP Score (for /op breakdown)
 local lastScoredTooltip = nil
@@ -476,8 +470,7 @@ local function AddScoreToTooltip(tooltip)
     lastScoredTooltip = tooltip
 
     tooltip:AddLine(" ")
-    local multi = (OctoPawn_AnyTipSpecsEnabled and OctoPawn_AnyTipSpecsEnabled())
-        or (OctoPawnDB and OctoPawnDB.showAllSpecs)
+    local multi = OctoPawn_AnyTipSpecsEnabled and OctoPawn_AnyTipSpecsEnabled()
     if multi then
         AddAllSpecsToTooltip(tooltip)
     else
@@ -495,6 +488,7 @@ local function AddScoreToTooltip(tooltip)
     end
     tooltip:Show()
 end
+
 
 -- Find any currently-visible tooltip that has (or can produce) an item OP Score.
 -- Used by /op so breakdown works on Aux, Atlas-CFM, ItemRef, etc.
@@ -688,3 +682,4 @@ if GameTooltip.SetTradeSkillItem then hook("SetTradeSkillItem") end
 if GameTooltip.SetCraftItem then hook("SetCraftItem") end
 
 print("|cFF00FF00OctoPawn|r scoring core loaded")
+
