@@ -8,8 +8,8 @@ SlashCmdList["OCTOPAWN"] = function(msg)
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn commands:|r")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op|r - Score the hovered item only")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op compare|r - Toggle equip compare")
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op spec|r - Role / spec picker")
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op reset|r - Reset weights to role defaults")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op profile|r - Profile picker")
+        DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op reset|r - Reset weights to profile defaults")
         DEFAULT_CHAT_FRAME:AddMessage("|cFFFFFF00/op help|r - This help")
         return
     end
@@ -25,7 +25,7 @@ SlashCmdList["OCTOPAWN"] = function(msg)
         if OctoPawn_RefreshCompareButton then OctoPawn_RefreshCompareButton() end
         return
     end
-    if msg == "spec" then
+    if msg == "profile" or msg == "profiles" or msg == "spec" then
         if OctoPawn_ShowRolePicker then OctoPawn_ShowRolePicker() end
         return
     end
