@@ -6,11 +6,9 @@ local orderedBoxes = {}
 local createdFrames = {}
 local configFrame, scrollFrame, scrollChild, title
 local rolePickerFrame
-local compareBtn
 local advancedFrame
 local advRows = {}
 local shareFrame
-local allSpecsCheck
 
 local function StatLabel(stat)
     if OctoPawn_StatLabel then return OctoPawn_StatLabel(stat) end
@@ -136,15 +134,6 @@ if scrollBar then
 end
 
 
-local function UpdateCompareButtonText()
-    if not compareBtn then return end
-    if OctoPawnDB and OctoPawnDB.compareEnabled == false then
-        compareBtn:SetText("Compare: OFF")
-    else
-        compareBtn:SetText("Compare: ON")
-    end
-end
-
 local function MakeCmdButton(label, yOffset, onClick)
     local b = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
     b:SetWidth(105); b:SetHeight(26)
@@ -157,56 +146,49 @@ end
 MakeCmdButton("Profiles", -55, function()
     OctoPawn_ShowRolePicker()
 end)
-compareBtn = MakeCmdButton("Compare: ON", -88, function()
-    if not OctoPawnDB then OctoPawnDB = {} end
-    if OctoPawnDB.compareEnabled == false then
-        OctoPawnDB.compareEnabled = true
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Item compare ON|r")
-    else
-        OctoPawnDB.compareEnabled = false
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF9900OctoPawn: Item compare OFF|r")
-    end
-    UpdateCompareButtonText()
-end)
-MakeCmdButton("Help", -121, function()
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: /op /op compare /op profile /op reset /op help|r")
-end)
-MakeCmdButton("Soft Caps", -154, function()
+MakeCmdButton("Soft Caps", -88, function()
     if ToggleAdvancedFrame then ToggleAdvancedFrame() end
 end)
-MakeCmdButton("Share", -187, function()
+MakeCmdButton("Help", -121, function()
+    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: /op /op compare /op profile /op help|r")
+end)
+MakeCmdButton("Share", -154, function()
     if ToggleShareFrame then ToggleShareFrame() end
 end)
 
 -------------------------------------------------
--- All-specs checkbox
+-- Compare checkbox (on by default)
 -------------------------------------------------
-allSpecsCheck = CreateFrame("CheckButton", "OctoPawnAllSpecsCheck", configFrame, "UICheckButtonTemplate")
-allSpecsCheck:SetWidth(24); allSpecsCheck:SetHeight(24)
-allSpecsCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -252)
-allSpecsCheck:SetScript("OnClick", function()
+local compareCheck = CreateFrame("CheckButton", "OctoPawnCompareCheck", configFrame, "UICheckButtonTemplate")
+compareCheck:SetWidth(24); compareCheck:SetHeight(24)
+compareCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -186)
+compareCheck:SetScript("OnClick", function()
     if not OctoPawnDB then OctoPawnDB = {} end
-    OctoPawnDB.showAllSpecs = this:GetChecked() and true or false
+    OctoPawnDB.compareEnabled = this:GetChecked() and true or false
 end)
-local allSpecsLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-allSpecsLabel:SetPoint("RIGHT", allSpecsCheck, "LEFT", -2, 0)
-allSpecsLabel:SetText("All profiles on tip")
+local compareLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+compareLabel:SetPoint("RIGHT", compareCheck, "LEFT", -2, 0)
+compareLabel:SetText("Show upgrade +/-")
 
-local function SyncAllSpecsCheck()
-    if not allSpecsCheck then return end
-    if OctoPawnDB and OctoPawnDB.showAllSpecs then
-        allSpecsCheck:SetChecked(1)
+local function SyncCompareCheck()
+    if not compareCheck then return end
+    -- Activée par défaut : seule la valeur false la désactive
+    if OctoPawnDB and OctoPawnDB.compareEnabled == false then
+        compareCheck:SetChecked(0)
     else
-        allSpecsCheck:SetChecked(0)
+        compareCheck:SetChecked(1)
     end
 end
+-- Se resynchronise a chaque ouverture de la fenetre (la case est enfant de configFrame)
+compareCheck:SetScript("OnShow", SyncCompareCheck)
+
 
 -------------------------------------------------
 -- Compact tooltips checkbox (off by default)
 -------------------------------------------------
 local compactCheck = CreateFrame("CheckButton", "OctoPawnCompactCheck", configFrame, "UICheckButtonTemplate")
 compactCheck:SetWidth(24); compactCheck:SetHeight(24)
-compactCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -276)
+compactCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -210)
 compactCheck:SetScript("OnClick", function()
     if not OctoPawnDB then OctoPawnDB = {} end
     OctoPawnDB.compactTooltips = this:GetChecked() and true or false
@@ -229,7 +211,7 @@ end
 -------------------------------------------------
 local ignoreEnchantsCheck = CreateFrame("CheckButton", "OctoPawnIgnoreEnchantsCheck", configFrame, "UICheckButtonTemplate")
 ignoreEnchantsCheck:SetWidth(24); ignoreEnchantsCheck:SetHeight(24)
-ignoreEnchantsCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -300)
+ignoreEnchantsCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -234)
 ignoreEnchantsCheck:SetScript("OnClick", function()
     if not OctoPawnDB then OctoPawnDB = {} end
     OctoPawnDB.ignoreEnchants = this:GetChecked() and true or false
@@ -250,7 +232,7 @@ end
 ignoreEnchantsCheck:SetScript("OnShow", SyncIgnoreEnchantsCheck)
 
 
-function OctoPawn_RefreshCompareButton() UpdateCompareButtonText() end
+function OctoPawn_RefreshCompareButton() SyncCompareCheck() end
 
 -------------------------------------------------
 -- Share frame (import / export sparse)
@@ -571,8 +553,6 @@ function BuildEditBoxes()
             box:SetText(tostring(value))
             if box.opLabel then box.opLabel:SetText(StatLabel(stat)) end
         end
-        UpdateCompareButtonText()
-        SyncAllSpecsCheck()
         SyncCompactCheck()
         return
     end
@@ -629,8 +609,6 @@ function BuildEditBoxes()
         box:SetScript("OnTabPressed", function() FocusNextBox(this) end)
         box:SetScript("OnEnterPressed", function() FocusNextBox(this) end)
     end
-    UpdateCompareButtonText()
-    SyncAllSpecsCheck()
     SyncCompactCheck()
 end
 
@@ -654,7 +632,7 @@ end)
 
 function ToggleConfigFrame()
     if configFrame:IsShown() then configFrame:Hide()
-    else BuildEditBoxes(); UpdateCompareButtonText(); SyncAllSpecsCheck(); SyncCompactCheck(); configFrame:Show() end
+    else BuildEditBoxes(); SyncCompactCheck(); configFrame:Show() end
 end
 
 function OctoPawn_ShowRolePicker()
