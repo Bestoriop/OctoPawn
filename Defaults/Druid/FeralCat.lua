@@ -3,5 +3,5 @@
 -------------------------------------------------
 defaultWeights.DRUID = defaultWeights.DRUID or {}
 defaultWeights.DRUID.FeralCat = OctoPawn_Fill({
-    STRENGTH = 0.85, AGILITY = 1.35, ["ATTACK POWER"] = 1.05, ["FERAL ATTACK POWER"] = 1.1, CRIT = 2.35, HIT = 2.15, ["ARMOR PENETRATION"] = 1.15, DPS = 0.25, STAVES = 0, MACES = 0.1, POLEARMS = 0.15
+    STRENGTH = 2.64, AGILITY = 2.8, ["ATTACK POWER"] = 1, ["FERAL ATTACK POWER"] = 1, CRIT = 30.88, HIT = 32.78, ["ARMOR PENETRATION"] = 1.15, HASTE = 14.28
 })
