@@ -638,7 +638,7 @@ end
 function OctoPawn_ShowRolePicker()
     if not rolePickerFrame then
         rolePickerFrame = CreateFrame("Frame", "OctoPawnRolePicker", UIParent)
-        rolePickerFrame:SetWidth(360)
+        rolePickerFrame:SetWidth(380)
         rolePickerFrame:SetHeight(360)
         rolePickerFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
         rolePickerFrame:SetBackdrop({
@@ -713,17 +713,53 @@ function OctoPawn_ShowRolePicker()
         if configFrame and configFrame:IsShown() then BuildEditBoxes() end
     end
 
+    -- Sections : profils par défaut d'abord, puis profils personnalisés
+    local defaultRoles, customRoles = {}, {}
     for ri = 1, table.getn(roles) do
-        local role = roles[ri]
+        if OctoPawn_IsBuiltInRole and OctoPawn_IsBuiltInRole(class, roles[ri]) then
+            table.insert(defaultRoles, roles[ri])
+        else
+            table.insert(customRoles, roles[ri])
+        end
+    end
+    local orderedRoles = {}
+    local headerAt = {}
+    local headerCount = 0
+    if table.getn(defaultRoles) > 0 then
+        headerAt[table.getn(orderedRoles) + 1] = { "Default profiles", 1, 0.82, 0 }
+        for ri = 1, table.getn(defaultRoles) do table.insert(orderedRoles, defaultRoles[ri]) end
+    end
+    if table.getn(customRoles) > 0 then
+        headerAt[table.getn(orderedRoles) + 1] = { "Custom profiles", 0.25, 1, 0.25 }
+        for ri = 1, table.getn(customRoles) do table.insert(orderedRoles, customRoles[ri]) end
+    end
+
+    for ri = 1, table.getn(orderedRoles) do
+        local role = orderedRoles[ri]
         local isBuiltIn = OctoPawn_IsBuiltInRole and OctoPawn_IsBuiltInRole(class, role)
         local hasCustom = OctoPawn_HasCustomWeights and OctoPawn_HasCustomWeights(role)
         local isPureCustom = hasCustom and not isBuiltIn
 
+        if headerAt[ri] then
+            if ri > 1 then y = y - 6 end
+            local hdr = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            hdr:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 28, y)
+            hdr:SetText(headerAt[ri][1])
+            hdr:SetTextColor(headerAt[ri][2], headerAt[ri][3], headerAt[ri][4])
+            Track(hdr)
+            y = y - 18
+            headerCount = headerCount + 1
+        end
+
         local btn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-        btn:SetWidth(isPureCustom and 160 or 180)
+        btn:SetWidth(180)
         btn:SetHeight(26)
         btn:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 24, y)
-        btn:SetText(role)
+        if isBuiltIn then
+            btn:SetText(role)
+        else
+            btn:SetText("|cff40ff40" .. role .. "|r")
+        end
         btn.roleName = role
         btn:SetScript("OnClick", function()
             SelectRole(this.roleName, isPureCustom and true or false)
@@ -808,7 +844,7 @@ function OctoPawn_ShowRolePicker()
             cbtn:SetWidth(180)
             cbtn:SetHeight(26)
             cbtn:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 24, y)
-            cbtn:SetText(role .. " (custom)")
+            cbtn:SetText("|cffff8000" .. role .. " (custom)|r")
             cbtn.roleName = role
             cbtn:SetScript("OnClick", function()
                 SelectRole(this.roleName, true)
@@ -909,7 +945,7 @@ function OctoPawn_ShowRolePicker()
     closeBtn:SetScript("OnClick", function() rolePickerFrame:Hide() end)
     Track(closeBtn)
 
-    local height = 100 + (buttonCount * 30) + 60
+    local height = 100 + (buttonCount * 30) + (headerCount * 24) + 60
     if height < 200 then height = 200 end
     if height > 520 then height = 520 end
     rolePickerFrame:SetHeight(height)
