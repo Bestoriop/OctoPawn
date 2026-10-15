@@ -30,7 +30,8 @@ You can also open the full config window from the minimap button.
 Here is how it looks :
 
 <img width="500" height="597" alt="image" src="https://github.com/user-attachments/assets/ff879f31-2a6d-4aa2-96ae-c0444090a83c" />
-<img width="426" height="472" alt="image" src="https://github.com/user-attachments/assets/400f8aef-cc24-4a64-8493-e0f0e1a9d7e9" />
+<img width="452" height="535" alt="image" src="https://github.com/user-attachments/assets/47ec8e8d-9ebb-494e-85a8-a35df7d2acb7" />
+
 <img width="246" height="246" alt="image" src="https://github.com/user-attachments/assets/381f4f58-7d65-4c91-9a7a-ec0579abaedc" />
 
 ### Installation
