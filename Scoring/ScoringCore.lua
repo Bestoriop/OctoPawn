@@ -77,7 +77,7 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                 end
                 if not isEnchant and not (OctoPawn_IsSetBonusLine and OctoPawn_IsSetBonusLine(upper)) then
                     if string.find(upper, "DAMAGE PER SECOND") or string.find(upper, "DPS") then pastDPS = true end
-                    if pastDPS or not string.find(upper, "DAMAGE") or string.find(upper, "PER SECOND") or string.find(upper, "SPELLS") or string.find(upper, "SPELL DAMAGE") then
+                    if pastDPS or not string.find(upper, "DAMAGE") or string.find(upper, "PER SECOND") or string.find(upper, "SPELLS") or string.find(upper, "SPELL DAMAGE") or string.find(upper, "RETURNED AS HEALING") then
                         if not string.find(upper, "REQUIRES") and not string.find(upper, "SOULBOUND") and
                            not string.find(upper, "UNIQUE") and not string.find(upper, "LEVEL") and
                            not string.find(upper, "BIND") and not string.find(upper, "MADE BY") then
