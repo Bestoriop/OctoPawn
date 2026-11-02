@@ -33,7 +33,8 @@ Defaults\Warlock\Demonology.lua
 Defaults\Warlock\Destruction.lua
 Defaults\Druid\Balance.lua
 Defaults\Druid\FeralCat.lua
-Defaults\Druid\FeralBear.lua
+Defaults\Druid\FeralThreat.lua
+Defaults\Druid\FeralMitigation.lua
 Defaults\Druid\Restoration.lua
 
 Core.lua
