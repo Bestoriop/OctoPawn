@@ -1,7 +1,7 @@
 -------------------------------------------------
--- Defaults/Druid/Restoration.lua
+-- Defaults/Druid/Restoration.lua based on https://krokats.github.io/resto-sim/
 -------------------------------------------------
 defaultWeights.DRUID = defaultWeights.DRUID or {}
 defaultWeights.DRUID.Restoration = OctoPawn_Fill({
-    HEALING = 1.45, SPIRIT = 1.35, ["NATURE DAMAGE"] = 0.2, STAVES = 0.12, MACES = 0.1, DAGGERS = 0.05
+    HEALING = 1, SPIRIT = 0.46, ["INTELLECT"] = 0.3, ["SPELL CRIT"] = 10, ["MANA PER 5"] = 3
 })
