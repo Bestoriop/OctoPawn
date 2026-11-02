@@ -1,5 +1,5 @@
 -------------------------------------------------
--- Defaults/Druid/FeralThreat.lua
+-- Defaults/Druid/FeralThreat.lua based on https://docs.google.com/spreadsheets/d/19IALSBVKyTY1Gd63AQ-Bkbvv4I2KspxdPVWi6YtN1xA/edit?gid=1815312333#gid=1815312333
 -------------------------------------------------
 defaultWeights.DRUID = defaultWeights.DRUID or {}
 defaultWeights.DRUID.FeralThreat = OctoPawn_Fill({
