@@ -1,5 +1,5 @@
 -------------------------------------------------
--- Defaults/Druid/FeralCat.lua
+-- Defaults/Druid/FeralCat.lua based on https://krokats.github.io/feral-sim/
 -------------------------------------------------
 defaultWeights.DRUID = defaultWeights.DRUID or {}
 defaultWeights.DRUID.FeralCat = OctoPawn_Fill({
