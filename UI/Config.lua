@@ -505,7 +505,24 @@ local function ReadWeightBox(box)
     return val
 end
 
-local function SaveWeights()
+-- Valeurs affichées lors du dernier BuildEditBoxes : sert à savoir si l'utilisateur
+-- a réellement modifié quelque chose avant d'enregistrer un profil custom
+local editBaseline = {}
+
+local function WeightsChanged()
+    local stat, box
+    for stat, box in pairs(editBoxes) do
+        local val = tonumber(box:GetText())
+        if val == nil then val = 0 end
+        local base = editBaseline[stat]
+        if base == nil or math.abs(val - base) > 0.000001 then return true end
+    end
+    return false
+end
+
+-- force = true : enregistrement demandé explicitement (bouton Save Weights).
+-- Sinon (fermeture de la fenêtre), on n'enregistre que s'il y a eu une modification.
+local function SaveWeights(force)
     if not OctoPawnDB then OctoPawnDB = {} end
     if not OctoPawnDB.weights then OctoPawnDB.weights = {} end
     if not OctoPawnDB.customWeights then OctoPawnDB.customWeights = {} end
@@ -514,6 +531,7 @@ local function SaveWeights()
         for stat, box in pairs(editBoxes) do OctoPawnDB.weights[stat] = ReadWeightBox(box) end
         return
     end
+    if not force and not WeightsChanged() then return end
     OctoPawnDB.customWeights[role] = {}
     for stat, box in pairs(editBoxes) do
         local val = ReadWeightBox(box)
@@ -547,6 +565,7 @@ function BuildEditBoxes()
         if v == nil then v = 1.0 end
         vals[stat] = v
     end
+    editBaseline = vals
     if next(editBoxes) ~= nil then
         for stat, box in pairs(editBoxes) do
             local value = vals[stat]; if value == nil then value = 1.0 end
@@ -616,7 +635,7 @@ local saveBtn = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
 saveBtn:SetPoint("BOTTOM", configFrame, "BOTTOM", 0, 20)
 saveBtn:SetWidth(120); saveBtn:SetHeight(28); saveBtn:SetText("Save Weights")
 saveBtn:SetScript("OnClick", function()
-    SaveWeights(); WipeEditBoxes(); BuildEditBoxes(); scrollFrame:SetVerticalScroll(0)
+    SaveWeights(true); WipeEditBoxes(); BuildEditBoxes(); scrollFrame:SetVerticalScroll(0)
     local role = (OctoPawnDB and OctoPawnDB.role) or "current"
     DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Saved as " .. role .. " (custom).|r")
 end)
@@ -713,32 +732,40 @@ function OctoPawn_ShowRolePicker()
         if configFrame and configFrame:IsShown() then BuildEditBoxes() end
     end
 
-    -- Sections : profils par défaut d'abord, puis profils personnalisés
-    local defaultRoles, customRoles = {}, {}
-    for ri = 1, table.getn(roles) do
-        if OctoPawn_IsBuiltInRole and OctoPawn_IsBuiltInRole(class, roles[ri]) then
-            table.insert(defaultRoles, roles[ri])
-        else
-            table.insert(customRoles, roles[ri])
-        end
-    end
-    local orderedRoles = {}
+    -- Sections : profils par défaut d'abord, puis profils personnalisés.
+    -- Un profil par défaut modifié (poids sauvegardés sous le même nom) est un
+    -- profil personnalisé : il est listé dans "Custom profiles" et peut être renommé.
+    local rows = {}
+    local customRows = {}
     local headerAt = {}
     local headerCount = 0
-    if table.getn(defaultRoles) > 0 then
-        headerAt[table.getn(orderedRoles) + 1] = { "Default profiles", 1, 0.82, 0 }
-        for ri = 1, table.getn(defaultRoles) do table.insert(orderedRoles, defaultRoles[ri]) end
+    local nDefault = 0
+    for ri = 1, table.getn(roles) do
+        local r = roles[ri]
+        local builtIn = OctoPawn_IsBuiltInRole and OctoPawn_IsBuiltInRole(class, r)
+        local hasC = OctoPawn_HasCustomWeights and OctoPawn_HasCustomWeights(r)
+        if builtIn then
+            table.insert(rows, { role = r, kind = "default" })
+            nDefault = nDefault + 1
+            if hasC then table.insert(customRows, { role = r, kind = "derived" }) end
+        else
+            table.insert(customRows, { role = r, kind = "custom" })
+        end
     end
-    if table.getn(customRoles) > 0 then
-        headerAt[table.getn(orderedRoles) + 1] = { "Custom profiles", 0.25, 1, 0.25 }
-        for ri = 1, table.getn(customRoles) do table.insert(orderedRoles, customRoles[ri]) end
+    if nDefault > 0 then
+        headerAt[1] = { "Default profiles", 1, 0.82, 0 }
+    end
+    if table.getn(customRows) > 0 then
+        headerAt[nDefault + 1] = { "Custom profiles", 0.25, 1, 0.25 }
+        for ri = 1, table.getn(customRows) do table.insert(rows, customRows[ri]) end
     end
 
-    for ri = 1, table.getn(orderedRoles) do
-        local role = orderedRoles[ri]
-        local isBuiltIn = OctoPawn_IsBuiltInRole and OctoPawn_IsBuiltInRole(class, role)
+    for ri = 1, table.getn(rows) do
+        local role = rows[ri].role
+        local kind = rows[ri].kind
         local hasCustom = OctoPawn_HasCustomWeights and OctoPawn_HasCustomWeights(role)
-        local isPureCustom = hasCustom and not isBuiltIn
+        -- Profil qui charge ses poids sauvegardés : dérivé d'un défaut, ou custom pur
+        local loadCustom = (kind == "derived") or (kind == "custom" and hasCustom and true or false)
 
         if headerAt[ri] then
             if ri > 1 then y = y - 6 end
@@ -755,45 +782,53 @@ function OctoPawn_ShowRolePicker()
         btn:SetWidth(180)
         btn:SetHeight(26)
         btn:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 24, y)
-        if isBuiltIn then
+        if kind == "default" then
             btn:SetText(role)
+        elseif kind == "derived" then
+            btn:SetText("|cff40ff40" .. role .. " (custom)|r")
         else
             btn:SetText("|cff40ff40" .. role .. "|r")
         end
         btn.roleName = role
         btn:SetScript("OnClick", function()
-            SelectRole(this.roleName, isPureCustom and true or false)
+            SelectRole(this.roleName, loadCustom)
         end)
         Track(btn)
 
-        local tip = CreateFrame("CheckButton", nil, rolePickerFrame, "UICheckButtonTemplate")
-        tip:SetWidth(24); tip:SetHeight(24)
-        tip:SetPoint("LEFT", btn, "RIGHT", 4, 0)
-        tip.roleName = role
-        if OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role) then tip:SetChecked(1) else tip:SetChecked(0) end
-        tip:SetScript("OnClick", function()
-            if OctoPawn_SetTipSpec then
-                OctoPawn_SetTipSpec(this.roleName, this:GetChecked() and true or false)
-            end
-        end)
-        tip:SetScript("OnEnter", function()
-            GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
-            GameTooltip:SetText("Show on tip", 1, 1, 1)
-            GameTooltip:AddLine("Include this profile on item tooltips", 0.7, 0.7, 0.7, 1)
-            GameTooltip:Show()
-        end)
-        tip:SetScript("OnLeave", function() GameTooltip:Hide() end)
-        Track(tip)
+        -- Case Tip : le profil dérivé n'en a pas, elle reste sur la ligne du profil
+        -- par défaut (le drapeau Tip est lié au nom du profil)
+        if kind ~= "derived" then
+            local tip = CreateFrame("CheckButton", nil, rolePickerFrame, "UICheckButtonTemplate")
+            tip:SetWidth(24); tip:SetHeight(24)
+            tip:SetPoint("LEFT", btn, "RIGHT", 4, 0)
+            tip.roleName = role
+            if OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role) then tip:SetChecked(1) else tip:SetChecked(0) end
+            tip:SetScript("OnClick", function()
+                if OctoPawn_SetTipSpec then
+                    OctoPawn_SetTipSpec(this.roleName, this:GetChecked() and true or false)
+                end
+            end)
+            tip:SetScript("OnEnter", function()
+                GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
+                GameTooltip:SetText("Show on tip", 1, 1, 1)
+                GameTooltip:AddLine("Include this profile on item tooltips", 0.7, 0.7, 0.7, 1)
+                GameTooltip:Show()
+            end)
+            tip:SetScript("OnLeave", function() GameTooltip:Hide() end)
+            Track(tip)
 
-        local tipLbl = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        tipLbl:SetPoint("LEFT", tip, "RIGHT", 0, 0)
-        tipLbl:SetText("Tip")
-        Track(tipLbl)
+            local tipLbl = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            tipLbl:SetPoint("LEFT", tip, "RIGHT", 0, 0)
+            tipLbl:SetText("Tip")
+            Track(tipLbl)
+        end
 
-        if hasCustom then
+        -- X (supprimer) et Rename : profils personnalisés uniquement, y compris
+        -- ceux dérivés d'un profil par défaut. Ancrage commun pour l'alignement.
+        if kind ~= "default" and hasCustom then
             local del = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
             del:SetWidth(28); del:SetHeight(24)
-            del:SetPoint("LEFT", tipLbl, "RIGHT", 8, 0)
+            del:SetPoint("LEFT", btn, "RIGHT", 52, 0)
             del:SetText("X")
             del.roleName = role
             del:SetScript("OnClick", function()
@@ -808,8 +843,8 @@ function OctoPawn_ShowRolePicker()
             del:SetScript("OnEnter", function()
                 GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
                 GameTooltip:SetText("Delete custom", 1, 0.3, 0.3)
-                if isBuiltIn then
-                    GameTooltip:AddLine("Removes saved custom weights for this profile", 0.7, 0.7, 0.7, 1)
+                if kind == "derived" then
+                    GameTooltip:AddLine("Removes your changes; the default profile is kept", 0.7, 0.7, 0.7, 1)
                 else
                     GameTooltip:AddLine("Deletes this custom profile entirely", 0.7, 0.7, 0.7, 1)
                 end
@@ -818,41 +853,24 @@ function OctoPawn_ShowRolePicker()
             del:SetScript("OnLeave", function() GameTooltip:Hide() end)
             Track(del)
 
-            if isPureCustom then
-                local ren = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-                ren:SetWidth(58); ren:SetHeight(24)
-                ren:SetPoint("LEFT", del, "RIGHT", 2, 0)
-                ren:SetText("Rename")
-                ren.roleName = role
-                ren:SetScript("OnClick", function()
-                    if rolePickerFrame.renameBox then
-                        rolePickerFrame.renameBox:Show()
-                        rolePickerFrame.renameBox:SetText(this.roleName)
-                        rolePickerFrame.renameBox.oldName = this.roleName
-                        rolePickerFrame.renameBox:SetFocus()
-                    end
-                end)
-                Track(ren)
-            end
-	end
-	
+            local ren = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
+            ren:SetWidth(58); ren:SetHeight(24)
+            ren:SetPoint("LEFT", del, "RIGHT", 2, 0)
+            ren:SetText("Rename")
+            ren.roleName = role
+            ren:SetScript("OnClick", function()
+                if rolePickerFrame.renameBox then
+                    rolePickerFrame.renameBox:Show()
+                    rolePickerFrame.renameBox:SetText(this.roleName)
+                    rolePickerFrame.renameBox.oldName = this.roleName
+                    rolePickerFrame.renameBox:SetFocus()
+                end
+            end)
+            Track(ren)
+        end
+
         y = y - 30
         buttonCount = buttonCount + 1
-
-        if isBuiltIn and hasCustom then
-            local cbtn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-            cbtn:SetWidth(180)
-            cbtn:SetHeight(26)
-            cbtn:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 24, y)
-            cbtn:SetText("|cffff8000" .. role .. " (custom)|r")
-            cbtn.roleName = role
-            cbtn:SetScript("OnClick", function()
-                SelectRole(this.roleName, true)
-            end)
-            Track(cbtn)
-            y = y - 30
-            buttonCount = buttonCount + 1
-        end
     end
 
     y = y - 6
@@ -954,3 +972,4 @@ end
 
 function OctoPawn_OnDBReady() end
 print("|cFF00FF00OctoPawn|r UI loaded")
+
