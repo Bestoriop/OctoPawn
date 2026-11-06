@@ -137,13 +137,29 @@ function OctoPawn_RenameCustomSpec(oldName, newName)
     if OctoPawnDB.customWeights[newName] then
         return false, "A profile named " .. newName .. " already exists"
     end
-    OctoPawnDB.customWeights[newName] = OctoPawnDB.customWeights[oldName]
+    -- Profil dérivé d'un profil par défaut (même nom que lui) : une fois renommé,
+    -- il devient un profil custom autonome. On le complète avec le défaut d'origine
+    -- pour qu'aucune stat ne manque (une stat absente serait pondérée 1.0).
+    local wasBuiltIn = OctoPawn_IsBuiltInRole(class, oldName)
+    local data = OctoPawnDB.customWeights[oldName]
+    if wasBuiltIn then
+        local base = defaultWeights and defaultWeights[class] and defaultWeights[class][oldName]
+        if base then
+            local k, v
+            for k, v in pairs(base) do
+                if data[k] == nil then data[k] = v end
+            end
+        end
+    end
+    OctoPawnDB.customWeights[newName] = data
     OctoPawnDB.customWeights[oldName] = nil
     if OctoPawnDB.tipSpecs and OctoPawnDB.tipSpecs[oldName] then
         OctoPawnDB.tipSpecs[newName] = true
         OctoPawnDB.tipSpecs[oldName] = nil
     end
-    if OctoPawnDB.role == oldName then
+    -- Le profil actif suit le renommage, sauf si c'était le profil par défaut
+    -- (non modifié) qui était actif : il garde alors son nom.
+    if OctoPawnDB.role == oldName and (not wasBuiltIn or OctoPawnDB.useCustom) then
         OctoPawnDB.role = newName
         OctoPawnDB.useCustom = true
     end
@@ -402,4 +418,5 @@ initFrame:SetScript("OnEvent", function()
 end)
 
 print("|cFF00FF00OctoPawn|r core loaded")
+
 
