@@ -68,6 +68,7 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
             if line then
                 local upper = string.upper(line)
                 local isChanceOnHit = string.find(upper, "CHANCE ON HIT") ~= nil
+                local isThorns = string.find(upper, "TO THE ATTACKER") ~= nil
                 -- Option "Ignore enchants" : on saute les lignes d'enchant
                 -- (la ligne 1 est le nom de l'objet, vert sur les objets inhabituels)
                 local isEnchant = false
@@ -77,7 +78,7 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                 end
                 if not isEnchant and not (OctoPawn_IsSetBonusLine and OctoPawn_IsSetBonusLine(upper)) then
                     if string.find(upper, "DAMAGE PER SECOND") or string.find(upper, "DPS") then pastDPS = true end
-                    if pastDPS or not string.find(upper, "DAMAGE") or string.find(upper, "PER SECOND") or string.find(upper, "SPELLS") or string.find(upper, "SPELL DAMAGE") or string.find(upper, "RETURNED AS HEALING") then
+                    if pastDPS or not string.find(upper, "DAMAGE") or string.find(upper, "PER SECOND") or string.find(upper, "SPELLS") or string.find(upper, "SPELL DAMAGE") or string.find(upper, "RETURNED AS HEALING") or isThorns then
                         if not string.find(upper, "REQUIRES") and not string.find(upper, "SOULBOUND") and
                            not string.find(upper, "UNIQUE") and not string.find(upper, "LEVEL") and
                            not string.find(upper, "BIND") and not string.find(upper, "MADE BY") then
@@ -86,7 +87,8 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights)
                             for _, entry in ipairs(patterns) do
                                 if string.find(upper, entry.pattern) and not matchedThisLine[entry.stat] then
                                     local skip = false
-                                    if entry.stat == "HIT" and isChanceOnHit then skip = true
+                                    if isThorns and entry.stat ~= "THORNS" then skip = true  -- ligne de dégâts renvoyés : ne compte que pour THORNS (pas comme dégâts de sorts)
+                                    elseif entry.stat == "HIT" and isChanceOnHit then skip = true
                                     elseif entry.stat == "HIT" and string.find(upper, "SPELL") then skip = true
                                     elseif isChanceOnHit and (entry.stat == "HIT" or entry.stat == "CRIT"
                                         or entry.stat == "STRENGTH" or entry.stat == "AGILITY"
