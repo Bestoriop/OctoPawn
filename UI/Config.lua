@@ -19,7 +19,7 @@ local function StatLabel(stat)
         ["RANGED CRIT"] = "RANGED CRIT %", ["RANGED HASTE"] = "RANGED HASTE %",
         ["HOLY CRIT"] = "HOLY CRIT %", AVOIDANCE = "AVOIDANCE %", RESILIENCE = "RESILIENCE %",
         ["EXTRA ATTACK"] = "EXTRA ATTACK %",
-        LIFESTEAL = "LIFESTEAL %", ["CASTING REGEN"] = "CASTING REGEN %",
+        LIFESTEAL = "LIFESTEAL %", THORNS = "REFLECT DMG", ["CASTING REGEN"] = "CASTING REGEN %",
         ["MOVEMENT SPEED"] = "MOVEMENT SPEED %", ["MOUNT SPEED"] = "MOUNT SPEED %",
     }
     return map[stat] or stat
@@ -581,6 +581,9 @@ function BuildEditBoxes()
         local va = vals[a]
         local vb = vals[b]
         if va ~= vb then return va > vb end
+        -- Même valeur : tri alphabétique sur le libellé affiché (pas sur la clé interne)
+        local la, lb = StatLabel(a), StatLabel(b)
+        if la ~= lb then return la < lb end
         return a < b
     end)
     local y = -10
@@ -972,4 +975,5 @@ end
 
 function OctoPawn_OnDBReady() end
 print("|cFF00FF00OctoPawn|r UI loaded")
+
 
