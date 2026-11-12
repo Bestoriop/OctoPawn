@@ -32,6 +32,7 @@ OctoPawn_StatPatterns = {
     { pattern = "VAMPIRIC",                            stat = "LIFESTEAL" },
     { pattern = "WHEN STRUCK IN COMBAT INFLICTS",      stat = "THORNS" },  -- "When struck in combat inflicts 5 Nature damage to the attacker." (toutes écoles)
     { pattern = "DAMAGE TO THE ATTACKER",              stat = "THORNS" },  -- variantes de formulation
+    { pattern = "ADDS %d+ %a+ DAMAGE TO YOUR MELEE ATTACKS", stat = "MAGIC MELEE DMG" },  -- "Equip: Adds 5 Lightning damage to your melee attacks" (toutes écoles)
     { pattern = "DECREASES THE MAGICAL RESISTANCES OF YOUR SPELL TARGETS", stat = "SPELL PENETRATION" },
     { pattern = "DECREASES THE MAGICAL RESISTANCES",                     stat = "SPELL PENETRATION" },
     { pattern = "SPELL PENETRATION",                                    stat = "SPELL PENETRATION" },
@@ -209,4 +210,5 @@ function OctoPawn_IsEnchantLine(upper, r, g, b)
 end
 
 print("|cFF00FF00OctoPawn|r scoring stats loaded")
+
 
