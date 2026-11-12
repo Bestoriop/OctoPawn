@@ -65,16 +65,15 @@ local function CollectEquippedComparisons(tooltip, score)
     local tip = OctoPawn_GetScanTooltip and OctoPawn_GetScanTooltip()
     if not tip then return nil end
     local equippedList = {}
+    local _, _, candTotals = OctoPawn_ScoreTooltip(tooltip, nil, false)
     for _, s in ipairs(slots) do
         if GetInventoryItemLink("player", s) then
-            tip:SetOwner(UIParent, "ANCHOR_NONE")
-            tip:ClearLines()
-            tip.octoPawnScored = nil
-            tip:SetInventoryItem("player", s)
-            tip:Show()
-            local eqScore = OctoPawn_ScoreTooltip(tip)
-            tip:Hide()
-            table.insert(equippedList, { score = eqScore or 0, label = SLOT_LABEL[s] or ("Slot "..s), slot = s })
+            -- caps évalués sur l'équipement porté SANS l'objet remplacé
+            local eqTotals = OctoPawn_SlotTotals(s) or {}
+            local base = OctoPawn_BaseExcluding(s)
+            local eqScore = OctoPawn_ScoreTotals(eqTotals, nil, base)
+            local cScore = OctoPawn_ScoreTotals(candTotals or {}, nil, base)
+            table.insert(equippedList, { score = eqScore or 0, diff = (cScore or 0) - (eqScore or 0), label = SLOT_LABEL[s] or ("Slot "..s), slot = s })
         end
     end
     if table.getn(equippedList) == 0 then return nil end
@@ -88,7 +87,7 @@ function OctoPawn_FormatCompactDiffs(tooltip, score)
     local parts = ""
     local _, eq
     for _, eq in ipairs(equippedList) do
-        parts = parts .. " " .. FormatDiff(score - eq.score)
+        parts = parts .. " " .. FormatDiff(eq.diff)
     end
     return parts
 end
@@ -102,7 +101,7 @@ function OctoPawn_ShowComparison(tooltip, score)
     end
     local _, eq
     for _, eq in ipairs(equippedList) do
-        tooltip:AddLine(FormatDiff(score - eq.score) .. " |cFFAAAAAAvs " .. eq.label .. "|r")
+        tooltip:AddLine(FormatDiff(eq.diff) .. " |cFFAAAAAAvs " .. eq.label .. "|r")
     end
 end
 print("|cFF00FF00OctoPawn|r compare loaded")
