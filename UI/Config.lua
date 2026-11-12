@@ -367,10 +367,10 @@ local function EnsureAdvancedFrame()
     hdr1:SetText("Stat")
     local hdr2 = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hdr2:SetPoint("TOPLEFT", advancedFrame, "TOPLEFT", 200, -48)
-    hdr2:SetText("Soft Cap")
+    hdr2:SetText("Soft Cap %")
     local hdr3 = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
     hdr3:SetPoint("TOPLEFT", advancedFrame, "TOPLEFT", 300, -48)
-    hdr3:SetText("Post Scale")
+    hdr3:SetText("Post Cap value")
     advancedFrame.scroll = CreateFrame("ScrollFrame", "OctoPawnAdvScroll", advancedFrame, "UIPanelScrollFrameTemplate")
     advancedFrame.scroll:SetPoint("TOPLEFT", 16, -64)
     advancedFrame.scroll:SetPoint("BOTTOMRIGHT", -36, 50)
@@ -386,13 +386,10 @@ local function EnsureAdvancedFrame()
         local defaults = OctoPawn_GetDefaultDR and OctoPawn_GetDefaultDR() or {}
         local _, row
         for _, row in ipairs(advRows) do
-            local softVal = tonumber(row.soft:GetText()) or 0
-            local postVal = tonumber(row.post:GetText())
-            if not postVal then postVal = 0.5 end
-            if softVal > 0 then
-                OctoPawnDB.dr[row.stat] = { softCap = softVal, postScale = postVal }
-            elseif defaults[row.stat] then
-                OctoPawnDB.dr[row.stat] = { softCap = 0, postScale = postVal }
+            local capVal = tonumber(row.soft:GetText()) or 0
+            local postVal = tonumber(row.post:GetText()) or 0
+            if capVal > 0 then
+                OctoPawnDB.dr[row.stat] = { softCap = capVal, postValue = postVal }
             end
         end
         DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Soft caps saved.|r")
@@ -465,7 +462,7 @@ local function BuildAdvancedRows()
             post:SetText(tostring(OctoPawnDB.dr[stat].postScale or 0))
         elseif dr and dr.softCap then
             soft:SetText(tostring(dr.softCap))
-            post:SetText(tostring(dr.postScale or 0.5))
+            post:SetText(tostring(dr.postValue or 0))
         else
             soft:SetText("0")
             post:SetText("0")
