@@ -1,15 +1,6 @@
 -------------------------------------------------
 -- OctoPawn UI/Config.lua
 -------------------------------------------------
-local editBoxes = {}
-local orderedBoxes = {}
-local createdFrames = {}
-local configFrame, scrollFrame, scrollChild, title
-local rolePickerFrame
-local advancedFrame
-local advRows = {}
-local shareFrame
-
 local function StatLabel(stat)
     if OctoPawn_StatLabel then return OctoPawn_StatLabel(stat) end
     local map = {
@@ -84,416 +75,227 @@ delayFrame:SetScript("OnEvent", function()
     UpdateMinimapButtonPosition()
 end)
 
-configFrame = CreateFrame("Frame", nil, UIParent)
-configFrame:SetWidth(420); configFrame:SetHeight(500)
-configFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-configFrame:SetBackdrop({
+-------------------------------------------------
+-- Fenêtre principale (une seule fenêtre à onglets)
+-------------------------------------------------
+local editBoxes = {}      -- [stat] = poids
+local capBoxes = {}       -- [stat] = cap
+local postBoxes = {}      -- [stat] = valeur après cap
+local statLabels = {}     -- [stat] = FontString
+local orderedBoxes = {}
+local createdFrames = {}
+local editBaseline = {}   -- poids affichés au dernier BuildEditBoxes
+local capBaseline = {}    -- [stat] = { cap, post }
+local configFrame, scrollFrame, scrollChild, title
+local weightsTab, optionsTab, shareTab
+local UpdateWeightsTitle
+local tabButtons = {}
+local copyBtn, copyDD, listTab
+local weightsTitle, building
+local listItems = {}
+local hdrCap, hdrPost, capHint
+local showCapsCheck
+local BuildEditBoxes, WipeEditBoxes, SaveWeights, ShowTab, WeightsChanged
+
+local COL_WEIGHT_X, COL_LABEL_X, COL_CAP_X, COL_POST_X = 10, 84, 262, 324
+
+local BACKDROP = {
     bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
     edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
     tile = true, tileSize = 32, edgeSize = 32,
-})
+    insets = { left = 8, right = 8, top = 8, bottom = 8 },
+}
+local BOXBACKDROP = {
+    bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 8, edgeSize = 12,
+}
+
+local function Msg(text) DEFAULT_CHAT_FRAME:AddMessage(text) end
+
+local function ShowCapsOn()
+    return OctoPawnDB and OctoPawnDB.showCaps and true or false
+end
+
+local function FmtNum(v)
+    if v == nil then return "0" end
+    return tostring(v)
+end
+
+configFrame = CreateFrame("Frame", "OctoPawnConfigFrame", UIParent)
+configFrame:SetWidth(480); configFrame:SetHeight(540)
+configFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+configFrame:SetBackdrop(BACKDROP)
 configFrame:Hide()
 configFrame:EnableMouse(true)
 configFrame:SetMovable(true)
 configFrame:RegisterForDrag("LeftButton")
 configFrame:SetScript("OnDragStart", function() this:StartMoving() end)
 configFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
+
 title = configFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
 title:SetPoint("TOP", configFrame, "TOP", 0, -18)
 title:SetText("OctoPawn")
 local closeBtn = CreateFrame("Button", nil, configFrame, "UIPanelCloseButton")
 closeBtn:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -4, -4)
-scrollFrame = CreateFrame("ScrollFrame", "OctoPawnScrollFrame", configFrame, "UIPanelScrollFrameTemplate")
-scrollFrame:SetPoint("TOPLEFT", configFrame, "TOPLEFT", 20, -50)
-scrollFrame:SetPoint("BOTTOMRIGHT", configFrame, "BOTTOMRIGHT", -150, 70)
+
+-- Onglets
+local function MakeTabButton(label, key, x, w)
+    local b = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
+    b:SetWidth(w); b:SetHeight(24)
+    b:SetPoint("TOPLEFT", configFrame, "TOPLEFT", x, -50)
+    b:SetText(label)
+    b.tabKey = key
+    b:SetScript("OnClick", function() ShowTab(this.tabKey) end)
+    tabButtons[key] = b
+    return b
+end
+MakeTabButton("List of profiles", "list", 24, 108)
+MakeTabButton("Weights", "weights", 136, 76)
+MakeTabButton("Options", "options", 216, 76)
+MakeTabButton("Share", "share", 296, 64)
+
+local function MakeTabFrame()
+    local f = CreateFrame("Frame", nil, configFrame)
+    f:SetPoint("TOPLEFT", configFrame, "TOPLEFT", 16, -80)
+    f:SetPoint("BOTTOMRIGHT", configFrame, "BOTTOMRIGHT", -16, 16)
+    f:Hide()
+    return f
+end
+weightsTab = MakeTabFrame()
+optionsTab = MakeTabFrame()
+shareTab = MakeTabFrame()
+listTab = MakeTabFrame()
+
+function ShowTab(key)
+    if copyDD and CloseDropDownMenus then CloseDropDownMenus() end
+    weightsTab:Hide(); optionsTab:Hide(); shareTab:Hide(); listTab:Hide()
+    if key == "list" then
+        OctoPawn_BuildProfileList()
+        listTab:Show()
+    elseif key == "options" then optionsTab:Show()
+    elseif key == "share" then shareTab:Show()
+    else key = "weights"; weightsTab:Show() end
+    local k, b
+    for k, b in pairs(tabButtons) do
+        if k == key then b:Disable() else b:Enable() end
+    end
+    configFrame.currentTab = key
+end
+
+-------------------------------------------------
+-- Onglet Weights
+-------------------------------------------------
+weightsTitle = weightsTab:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
+weightsTitle:SetPoint("TOPLEFT", weightsTab, "TOPLEFT", 4, -4)
+weightsTitle:SetWidth(270); weightsTitle:SetJustifyH("LEFT")
+weightsTitle:SetText("Weights")
+
+local HDR_Y = -26
+local hdrWeight = weightsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+hdrWeight:SetPoint("TOPLEFT", weightsTab, "TOPLEFT", COL_WEIGHT_X, HDR_Y)
+hdrWeight:SetWidth(62); hdrWeight:SetJustifyH("CENTER"); hdrWeight:SetText("Weight")
+local hdrStat = weightsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+hdrStat:SetPoint("TOPLEFT", weightsTab, "TOPLEFT", COL_LABEL_X, HDR_Y)
+hdrStat:SetText("Stat")
+hdrCap = weightsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+hdrCap:SetPoint("TOPLEFT", weightsTab, "TOPLEFT", COL_CAP_X, HDR_Y)
+hdrCap:SetWidth(54); hdrCap:SetJustifyH("CENTER"); hdrCap:SetText("Cap")
+hdrPost = weightsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+hdrPost:SetPoint("TOPLEFT", weightsTab, "TOPLEFT", COL_POST_X, HDR_Y)
+hdrPost:SetWidth(54); hdrPost:SetJustifyH("CENTER"); hdrPost:SetText("After cap")
+
+showCapsCheck = CreateFrame("CheckButton", "OctoPawnShowCapsCheck", weightsTab, "UICheckButtonTemplate")
+showCapsCheck:SetWidth(22); showCapsCheck:SetHeight(22)
+showCapsCheck:SetPoint("TOPLEFT", weightsTab, "TOPLEFT", 352, 1)
+local showCapsLbl = weightsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+showCapsLbl:SetPoint("RIGHT", showCapsCheck, "LEFT", -2, 0)
+showCapsLbl:SetText("Show caps")
+
+capHint = weightsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+capHint:SetPoint("BOTTOMLEFT", weightsTab, "BOTTOMLEFT", 4, 40)
+capHint:SetWidth(430); capHint:SetJustifyH("LEFT")
+capHint:SetTextColor(0.7, 0.7, 0.7)
+capHint:SetText("Cap = max total on your gear (0 = none). After cap = value per point above it.")
+
+scrollFrame = CreateFrame("ScrollFrame", "OctoPawnScrollFrame", weightsTab, "UIPanelScrollFrameTemplate")
+scrollFrame:SetPoint("TOPLEFT", weightsTab, "TOPLEFT", 0, -42)
+scrollFrame:SetPoint("BOTTOMRIGHT", weightsTab, "BOTTOMRIGHT", -24, 56)
 scrollFrame:EnableMouseWheel(true)
 scrollFrame:SetScript("OnMouseWheel", function()
     local current = this:GetVerticalScroll()
     local maxScroll = this:GetVerticalScrollRange()
-    local scrollStep = 28
-    if arg1 > 0 then
-        local newPos = current - scrollStep
-        if newPos < 0 then newPos = 0 end
-        this:SetVerticalScroll(newPos)
-    else
-        local newPos = current + scrollStep
-        if newPos > maxScroll then newPos = maxScroll end
-        this:SetVerticalScroll(newPos)
-    end
+    local step = 28
+    local newPos
+    if arg1 > 0 then newPos = current - step else newPos = current + step end
+    if newPos < 0 then newPos = 0 end
+    if newPos > maxScroll then newPos = maxScroll end
+    this:SetVerticalScroll(newPos)
 end)
 scrollChild = CreateFrame("Frame", nil, scrollFrame)
-scrollChild:SetWidth(250); scrollChild:SetHeight(1600)
+scrollChild:SetWidth(390); scrollChild:SetHeight(1600)
 scrollFrame:SetScrollChild(scrollChild)
 
--- Décale la barre de défilement vers la gauche (elle collait les boutons de droite)
-local scrollBar = getglobal("OctoPawnScrollFrameScrollBar")
-if scrollBar then
-    scrollBar:ClearAllPoints()
-    scrollBar:SetPoint("TOPLEFT", scrollFrame, "TOPRIGHT", -4, -16)
-    scrollBar:SetPoint("BOTTOMLEFT", scrollFrame, "BOTTOMRIGHT", -4, 16)
+local function ApplyCapsVisibility()
+    local on = ShowCapsOn()
+    local stat
+    for stat in pairs(capBoxes) do
+        if on then capBoxes[stat]:Show(); postBoxes[stat]:Show()
+        else capBoxes[stat]:Hide(); postBoxes[stat]:Hide() end
+    end
+    if on then hdrCap:Show(); hdrPost:Show(); capHint:Show()
+    else hdrCap:Hide(); hdrPost:Hide(); capHint:Hide() end
+    if on then showCapsCheck:SetChecked(1) else showCapsCheck:SetChecked(0) end
 end
 
-
-local function MakeCmdButton(label, yOffset, onClick)
-    local b = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
-    b:SetWidth(105); b:SetHeight(26)
-    b:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, yOffset)
-    b:SetText(label)
-    b:SetScript("OnClick", onClick)
-    return b
+-- Libellé de la stat ; caps masqués : rappel vert "(cap N)" si un cap est défini
+local function RefreshCapLabel(stat)
+    local lab = statLabels[stat]
+    if not lab then return end
+    local text = StatLabel(stat)
+    if not ShowCapsOn() and capBoxes[stat] then
+        local c = tonumber(capBoxes[stat]:GetText()) or 0
+        if c > 0 then text = text .. " |cff40ff40(cap " .. capBoxes[stat]:GetText() .. ")|r" end
+    end
+    lab:SetText(text)
+end
+local function RefreshAllCapLabels()
+    local stat
+    for stat in pairs(statLabels) do RefreshCapLabel(stat) end
 end
 
-MakeCmdButton("Profiles", -55, function()
-    OctoPawn_ShowRolePicker()
-end)
-MakeCmdButton("Soft Caps", -88, function()
-    if ToggleAdvancedFrame then ToggleAdvancedFrame() end
-end)
-MakeCmdButton("Help", -121, function()
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: /op /op compare /op profile /op help|r")
-end)
-MakeCmdButton("Share", -154, function()
-    if ToggleShareFrame then ToggleShareFrame() end
-end)
-
--------------------------------------------------
--- Compare checkbox (on by default)
--------------------------------------------------
-local compareCheck = CreateFrame("CheckButton", "OctoPawnCompareCheck", configFrame, "UICheckButtonTemplate")
-compareCheck:SetWidth(24); compareCheck:SetHeight(24)
-compareCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -186)
-compareCheck:SetScript("OnClick", function()
+showCapsCheck:SetScript("OnClick", function()
     if not OctoPawnDB then OctoPawnDB = {} end
-    OctoPawnDB.compareEnabled = this:GetChecked() and true or false
+    OctoPawnDB.showCaps = this:GetChecked() and true or false
+    ApplyCapsVisibility()
+    RefreshAllCapLabels()
 end)
-local compareLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-compareLabel:SetPoint("RIGHT", compareCheck, "LEFT", -2, 0)
-compareLabel:SetText("Show upgrade +/-")
 
-local function SyncCompareCheck()
-    if not compareCheck then return end
-    -- Activée par défaut : seule la valeur false la désactive
-    if OctoPawnDB and OctoPawnDB.compareEnabled == false then
-        compareCheck:SetChecked(0)
-    else
-        compareCheck:SetChecked(1)
-    end
-end
--- Se resynchronise a chaque ouverture de la fenetre (la case est enfant de configFrame)
-compareCheck:SetScript("OnShow", SyncCompareCheck)
-
-
--------------------------------------------------
--- Compact tooltips checkbox (off by default)
--------------------------------------------------
-local compactCheck = CreateFrame("CheckButton", "OctoPawnCompactCheck", configFrame, "UICheckButtonTemplate")
-compactCheck:SetWidth(24); compactCheck:SetHeight(24)
-compactCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -210)
-compactCheck:SetScript("OnClick", function()
-    if not OctoPawnDB then OctoPawnDB = {} end
-    OctoPawnDB.compactTooltips = this:GetChecked() and true or false
-end)
-local compactLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-compactLabel:SetPoint("RIGHT", compactCheck, "LEFT", -2, 0)
-compactLabel:SetText("Compact tooltips")
-
-local function SyncCompactCheck()
-    if not compactCheck then return end
-    if OctoPawnDB and OctoPawnDB.compactTooltips then
-        compactCheck:SetChecked(1)
-    else
-        compactCheck:SetChecked(0)
-    end
+function UpdateWeightsTitle()
+    if building or not weightsTitle then return end
+    local role = (OctoPawnDB and OctoPawnDB.role) or "Default"
+    local suffix = (OctoPawnDB and OctoPawnDB.useCustom) and " (custom)" or ""
+    local star = ""
+    if next(editBoxes) ~= nil and WeightsChanged() then star = " |cffff9900*|r" end
+    weightsTitle:SetText(role .. suffix .. " - Weights" .. star)
 end
 
--------------------------------------------------
--- Ignore enchants checkbox (off by default)
--------------------------------------------------
-local ignoreEnchantsCheck = CreateFrame("CheckButton", "OctoPawnIgnoreEnchantsCheck", configFrame, "UICheckButtonTemplate")
-ignoreEnchantsCheck:SetWidth(24); ignoreEnchantsCheck:SetHeight(24)
-ignoreEnchantsCheck:SetPoint("TOPRIGHT", configFrame, "TOPRIGHT", -18, -234)
-ignoreEnchantsCheck:SetScript("OnClick", function()
-    if not OctoPawnDB then OctoPawnDB = {} end
-    OctoPawnDB.ignoreEnchants = this:GetChecked() and true or false
-end)
-local ignoreEnchantsLabel = configFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-ignoreEnchantsLabel:SetPoint("RIGHT", ignoreEnchantsCheck, "LEFT", -2, 0)
-ignoreEnchantsLabel:SetText("Ignore enchants")
-
-local function SyncIgnoreEnchantsCheck()
-    if not ignoreEnchantsCheck then return end
-    if OctoPawnDB and OctoPawnDB.ignoreEnchants then
-        ignoreEnchantsCheck:SetChecked(1)
-    else
-        ignoreEnchantsCheck:SetChecked(0)
-    end
-end
--- Se resynchronise a chaque ouverture de la fenetre (la case est enfant de configFrame)
-ignoreEnchantsCheck:SetScript("OnShow", SyncIgnoreEnchantsCheck)
-
-
-function OctoPawn_RefreshCompareButton() SyncCompareCheck() end
-
--------------------------------------------------
--- Share frame (import / export sparse)
--------------------------------------------------
-local function EnsureShareFrame()
-    if shareFrame then return end
-    shareFrame = CreateFrame("Frame", "OctoPawnShareFrame", UIParent)
-    shareFrame:SetWidth(420); shareFrame:SetHeight(200)
-    shareFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 40)
-    shareFrame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-    })
-    shareFrame:SetFrameStrata("DIALOG")
-    shareFrame:EnableMouse(true)
-    shareFrame:SetMovable(true)
-    shareFrame:RegisterForDrag("LeftButton")
-    shareFrame:SetScript("OnDragStart", function() this:StartMoving() end)
-    shareFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    shareFrame:Hide()
-
-    local st = shareFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-    st:SetPoint("TOP", shareFrame, "TOP", 0, -14)
-    st:SetText("Share Weights")
-
-    local close = CreateFrame("Button", nil, shareFrame, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", shareFrame, "TOPRIGHT", -4, -4)
-
-    local hint = shareFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hint:SetPoint("TOP", st, "BOTTOM", 0, -4)
-    hint:SetText("Sparse export — only stats that differ from profile defaults")
-
-    local box = CreateFrame("EditBox", "OctoPawnShareEditBox", shareFrame)
-    box:SetPoint("TOPLEFT", shareFrame, "TOPLEFT", 20, -50)
-    box:SetPoint("BOTTOMRIGHT", shareFrame, "BOTTOMRIGHT", -20, 50)
-    box:SetMultiLine(true)
-    box:SetAutoFocus(false)
-    box:SetFontObject("GameFontHighlightSmall")
-    box:SetMaxLetters(2500)
-    box:SetBackdrop({
-        bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
-        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-        tile = true, tileSize = 8, edgeSize = 12,
-        insets = { left = 4, right = 4, top = 4, bottom = 4 },
-    })
-    box:SetBackdropColor(0, 0, 0, 0.8)
-    box:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
-    box:SetTextInsets(6, 6, 6, 6)
-    box:SetScript("OnEscapePressed", function() this:ClearFocus() end)
-    shareFrame.edit = box
-
-    local exportBtn = CreateFrame("Button", nil, shareFrame, "UIPanelButtonTemplate")
-    exportBtn:SetWidth(100); exportBtn:SetHeight(26)
-    exportBtn:SetPoint("BOTTOMLEFT", shareFrame, "BOTTOMLEFT", 30, 14)
-    exportBtn:SetText("Export")
-    exportBtn:SetScript("OnClick", function()
-        if not OctoPawn_ExportWeightsSparse then return end
-        local s, err = OctoPawn_ExportWeightsSparse()
-        if not s then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: Export failed — " .. tostring(err) .. "|r")
-            return
-        end
-        shareFrame.edit:SetText(s)
-        shareFrame.edit:HighlightText()
-        shareFrame.edit:SetFocus()
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Exported. Ctrl+C to copy.|r")
-    end)
-
-    local importBtn = CreateFrame("Button", nil, shareFrame, "UIPanelButtonTemplate")
-    importBtn:SetWidth(100); importBtn:SetHeight(26)
-    importBtn:SetPoint("BOTTOMRIGHT", shareFrame, "BOTTOMRIGHT", -30, 14)
-    importBtn:SetText("Import")
-    importBtn:SetScript("OnClick", function()
-        local text = shareFrame.edit:GetText() or ""
-        if not OctoPawn_ImportWeightsSparse then return end
-        local ok, info = OctoPawn_ImportWeightsSparse(text)
-        if not ok then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: Import failed — " .. tostring(info) .. "|r")
-            return
-        end
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Imported weights for " .. tostring(info) .. " (custom).|r")
-        shareFrame:Hide()
-        if configFrame and configFrame:IsShown() then
-            WipeEditBoxes()
-            BuildEditBoxes()
-        end
-        if OctoPawn_UpdatePlayerPaperScore then OctoPawn_UpdatePlayerPaperScore() end
-    end)
-end
-
-function ToggleShareFrame()
-    EnsureShareFrame()
-    if shareFrame:IsShown() then
-        shareFrame:Hide()
-    else
-        shareFrame.edit:SetText("")
-        shareFrame:Show()
-    end
-end
-
--------------------------------------------------
--- Advanced soft-cap UI
--------------------------------------------------
-local function EnsureAdvancedFrame()
-    if advancedFrame then return end
-    advancedFrame = CreateFrame("Frame", "OctoPawnAdvancedFrame", UIParent)
-    advancedFrame:SetWidth(460); advancedFrame:SetHeight(420)
-    advancedFrame:SetPoint("CENTER", 40, 20)
-    advancedFrame:SetBackdrop({
-        bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-        edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-        tile = true, tileSize = 32, edgeSize = 32,
-    })
-    advancedFrame:SetFrameStrata("DIALOG")
-    advancedFrame:EnableMouse(true)
-    advancedFrame:SetMovable(true)
-    advancedFrame:RegisterForDrag("LeftButton")
-    advancedFrame:SetScript("OnDragStart", function() this:StartMoving() end)
-    advancedFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-    advancedFrame:Hide()
-    local at = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-    at:SetPoint("TOP", advancedFrame, "TOP", 0, -14); at:SetText("Advanced — Soft Caps")
-    local close = CreateFrame("Button", nil, advancedFrame, "UIPanelCloseButton")
-    close:SetPoint("TOPRIGHT", -4, -4)
-    local hint = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    hint:SetPoint("TOP", at, "BOTTOM", 0, -4)
-    hint:SetText("Soft Cap 0 = no DR for that stat")
-
-    local hdr1 = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    hdr1:SetPoint("TOPLEFT", advancedFrame, "TOPLEFT", 24, -48)
-    hdr1:SetText("Stat")
-    local hdr2 = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    hdr2:SetPoint("TOPLEFT", advancedFrame, "TOPLEFT", 200, -48)
-    hdr2:SetText("Soft Cap %")
-    local hdr3 = advancedFrame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    hdr3:SetPoint("TOPLEFT", advancedFrame, "TOPLEFT", 300, -48)
-    hdr3:SetText("Post Cap value")
-    advancedFrame.scroll = CreateFrame("ScrollFrame", "OctoPawnAdvScroll", advancedFrame, "UIPanelScrollFrameTemplate")
-    advancedFrame.scroll:SetPoint("TOPLEFT", 16, -64)
-    advancedFrame.scroll:SetPoint("BOTTOMRIGHT", -36, 50)
-    advancedFrame.child = CreateFrame("Frame", nil, advancedFrame.scroll)
-    advancedFrame.child:SetWidth(400); advancedFrame.child:SetHeight(2000)
-    advancedFrame.scroll:SetScrollChild(advancedFrame.child)
-    local save = CreateFrame("Button", nil, advancedFrame, "UIPanelButtonTemplate")
-    save:SetWidth(120); save:SetHeight(26); save:SetPoint("BOTTOM", -70, 16)
-    save:SetText("Save Soft Caps")
-    save:SetScript("OnClick", function()
-        if not OctoPawnDB then OctoPawnDB = {} end
-        OctoPawnDB.dr = {}
-        local defaults = OctoPawn_GetDefaultDR and OctoPawn_GetDefaultDR() or {}
-        local _, row
-        for _, row in ipairs(advRows) do
-            local capVal = tonumber(row.soft:GetText()) or 0
-            local postVal = tonumber(row.post:GetText()) or 0
-            if capVal > 0 then
-                OctoPawnDB.dr[row.stat] = { softCap = capVal, postValue = postVal }
-            end
-        end
-        DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Soft caps saved.|r")
-    end)
-    local clear = CreateFrame("Button", nil, advancedFrame, "UIPanelButtonTemplate")
-    clear:SetWidth(100); clear:SetHeight(26); clear:SetPoint("BOTTOM", 70, 16)
-    clear:SetText("Clear All")
-    clear:SetScript("OnClick", function()
-        if not OctoPawnDB then OctoPawnDB = {} end
-        OctoPawnDB.dr = {}
-        local _, row
-        for _, row in ipairs(advRows) do row.soft:SetText("0"); row.post:SetText("0") end
-        DEFAULT_CHAT_FRAME:AddMessage("|cFFFF9900OctoPawn: Soft caps cleared.|r")
-    end)
-end
-
-local function BuildAdvancedRows()
-    EnsureAdvancedFrame()
-    local _, row
-    for _, row in ipairs(advRows) do
-        if row.frame then row.frame:Hide(); row.frame:SetParent(nil) end
-    end
-    advRows = {}
-    local weights = (OctoPawnDB and OctoPawnDB.weights) or {}
-    local defaults = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
-    local statsMap = {}
-    for s in pairs(weights) do statsMap[s] = true end
-    for s in pairs(defaults) do statsMap[s] = true end
-    if not next(statsMap) and defaultWeights then
-        for _, classTable in pairs(defaultWeights) do
-            if type(classTable) == "table" then
-                for k, v in pairs(classTable) do
-                    if type(v) == "table" then
-                        for s in pairs(v) do statsMap[s] = true end
-                    else
-                        statsMap[k] = true
-                    end
-                end
-            end
-        end
-    end
-    local stats = {}
-    for s in pairs(statsMap) do table.insert(stats, s) end
-    table.sort(stats)
-    local y = -4
-    local i, stat
-    for i, stat in ipairs(stats) do
-        local f = CreateFrame("Frame", nil, advancedFrame.child)
-        f:SetWidth(380); f:SetHeight(24)
-        f:SetPoint("TOPLEFT", advancedFrame.child, "TOPLEFT", 4, y)
-        local lab = f:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        lab:SetPoint("LEFT", 2, 0); lab:SetWidth(170); lab:SetJustifyH("LEFT")
-        lab:SetText(StatLabel(stat))
-        local soft = CreateFrame("EditBox", nil, f)
-        soft:SetWidth(70); soft:SetHeight(18); soft:SetPoint("LEFT", 180, 0)
-        soft:SetAutoFocus(false); soft:SetFontObject("GameFontHighlight"); soft:SetJustifyH("CENTER")
-        soft:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 8, edgeSize = 12 })
-        soft:SetBackdropColor(0.1, 0.1, 0.1, 0.9); soft:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
-        local post = CreateFrame("EditBox", nil, f)
-        post:SetWidth(70); post:SetHeight(18); post:SetPoint("LEFT", 280, 0)
-        post:SetAutoFocus(false); post:SetFontObject("GameFontHighlight"); post:SetJustifyH("CENTER")
-        post:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 8, edgeSize = 12 })
-        post:SetBackdropColor(0.1, 0.1, 0.1, 0.9); post:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
-        local dr = nil
-        if OctoPawn_GetDR then
-            dr = OctoPawn_GetDR(stat)
-        end
-        if OctoPawnDB and OctoPawnDB.dr and OctoPawnDB.dr[stat] and tonumber(OctoPawnDB.dr[stat].softCap) == 0 then
-            soft:SetText("0")
-            post:SetText(tostring(OctoPawnDB.dr[stat].postScale or 0))
-        elseif dr and dr.softCap then
-            soft:SetText(tostring(dr.softCap))
-            post:SetText(tostring(dr.postValue or 0))
-        else
-            soft:SetText("0")
-            post:SetText("0")
-        end
-        table.insert(advRows, { frame = f, stat = stat, soft = soft, post = post })
-        y = y - 26
-    end
-    advancedFrame.child:SetHeight(math.max(200, -y + 20))
-end
-
-function ToggleAdvancedFrame()
-    EnsureAdvancedFrame()
-    if advancedFrame:IsShown() then advancedFrame:Hide()
-    else BuildAdvancedRows(); advancedFrame:Show() end
-end
-
-local function WipeEditBoxes()
-    for _, frame in ipairs(createdFrames) do frame:Hide(); frame:SetParent(nil) end
-    createdFrames = {}; editBoxes = {}; orderedBoxes = {}
+function WipeEditBoxes()
+    local _, f
+    for _, f in ipairs(createdFrames) do f:Hide(); f:SetParent(nil) end
+    createdFrames = {}; editBoxes = {}; capBoxes = {}; postBoxes = {}; statLabels = {}; orderedBoxes = {}
     if scrollChild then scrollChild:Hide(); scrollChild:SetParent(nil) end
     scrollChild = CreateFrame("Frame", nil, scrollFrame)
-    scrollChild:SetWidth(250); scrollChild:SetHeight(1600)
+    scrollChild:SetWidth(390); scrollChild:SetHeight(1600)
     scrollFrame:SetScrollChild(scrollChild)
 end
+
 function OctoPawn_WipeConfigUI()
     WipeEditBoxes()
     if configFrame and configFrame:IsShown() then configFrame:Hide() end
 end
 
--- Lit le poids saisi : un champ vide (ou invalide) vaut 0 et est réécrit "0" dans la case
-local function ReadWeightBox(box)
+local function ReadNumBox(box)
     local val = tonumber(box:GetText())
     if val == nil then
         val = 0
@@ -502,55 +304,95 @@ local function ReadWeightBox(box)
     return val
 end
 
--- Valeurs affichées lors du dernier BuildEditBoxes : sert à savoir si l'utilisateur
--- a réellement modifié quelque chose avant d'enregistrer un profil custom
-local editBaseline = {}
-
-local function WeightsChanged()
+function WeightsChanged()
     local stat, box
     for stat, box in pairs(editBoxes) do
-        local val = tonumber(box:GetText())
-        if val == nil then val = 0 end
+        local val = tonumber(box:GetText()) or 0
         local base = editBaseline[stat]
         if base == nil or math.abs(val - base) > 0.000001 then return true end
+    end
+    for stat, box in pairs(capBoxes) do
+        local cb = capBaseline[stat] or { 0, 0 }
+        local c = tonumber(box:GetText()) or 0
+        local p = tonumber(postBoxes[stat]:GetText()) or 0
+        if math.abs(c - cb[1]) > 0.000001 or math.abs(p - cb[2]) > 0.000001 then return true end
     end
     return false
 end
 
--- force = true : enregistrement demandé explicitement (bouton Save Weights).
--- Sinon (fermeture de la fenêtre), on n'enregistre que s'il y a eu une modification.
-local function SaveWeights(force)
+-- Enregistre poids + caps dans le profil actif (bouton Save Weights uniquement)
+function SaveWeights()
     if not OctoPawnDB then OctoPawnDB = {} end
     if not OctoPawnDB.weights then OctoPawnDB.weights = {} end
     if not OctoPawnDB.customWeights then OctoPawnDB.customWeights = {} end
+    if type(OctoPawnDB.caps) ~= "table" then OctoPawnDB.caps = {} end
     local role = OctoPawnDB.role
+    local stat, box
     if not role then
-        for stat, box in pairs(editBoxes) do OctoPawnDB.weights[stat] = ReadWeightBox(box) end
+        for stat, box in pairs(editBoxes) do OctoPawnDB.weights[stat] = ReadNumBox(box) end
         return
     end
-    if not force and not WeightsChanged() then return end
     OctoPawnDB.customWeights[role] = {}
     for stat, box in pairs(editBoxes) do
-        local val = ReadWeightBox(box)
+        local val = ReadNumBox(box)
         OctoPawnDB.weights[stat] = val
         OctoPawnDB.customWeights[role][stat] = val
     end
+    local newCaps = {}
+    for stat, box in pairs(capBoxes) do
+        local c = ReadNumBox(box)
+        local p = ReadNumBox(postBoxes[stat])
+        if c > 0 then newCaps[stat] = { softCap = c, postValue = p } end
+    end
+    if next(newCaps) then OctoPawnDB.caps[role] = newCaps else OctoPawnDB.caps[role] = nil end
     OctoPawnDB.useCustom = true
 end
 
-function BuildEditBoxes()
+local function MakeNumBox(parent, x, y, width)
+    local box = CreateFrame("EditBox", nil, parent)
+    box:SetWidth(width); box:SetHeight(20); box:SetAutoFocus(false)
+    box:SetFontObject("GameFontHighlight"); box:SetJustifyH("CENTER")
+    box:SetPoint("TOPLEFT", parent, "TOPLEFT", x, y)
+    box:SetBackdrop(BOXBACKDROP)
+    box:SetBackdropColor(0.1, 0.1, 0.1, 0.9); box:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
+    box:SetScript("OnTextChanged", function()
+        local text = this:GetText() or ""
+        local clean = string.gsub(text, "[^0-9%.%-]", "")
+        if clean ~= text then this:SetText(clean) end
+        UpdateWeightsTitle()
+    end)
+    box:SetScript("OnEscapePressed", function() this:ClearFocus() end)
+    table.insert(createdFrames, box)
+    return box
+end
+
+local function ScrollToBox(box)
+    local y = box.opY or 0
+    local target = -y - 10
+    if target < 0 then target = 0 end
+    local maxScroll = scrollFrame:GetVerticalScrollRange()
+    if target > maxScroll then target = maxScroll end
+    scrollFrame:SetVerticalScroll(target)
+end
+
+local function FocusBox(box)
+    box:SetFocus(); box:HighlightText()
+    ScrollToBox(box)
+end
+
+local function BuildImpl()
     local playerClass = OctoPawn_GetClass and OctoPawn_GetClass() or "?"
     local role = (OctoPawnDB and OctoPawnDB.role) or "Default"
     local suffix = (OctoPawnDB and OctoPawnDB.useCustom) and " (custom)" or ""
-    title:SetText("OctoPawn - " .. playerClass .. " (" .. role .. suffix .. ")")
+    title:SetText("OctoPawn - " .. tostring(playerClass))
     local saved = (OctoPawnDB and OctoPawnDB.weights) or {}
     local defaults = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
+    local roleCaps = OctoPawn_GetCapsForRole and OctoPawn_GetCapsForRole(OctoPawnDB and OctoPawnDB.role) or {}
     local allStats = {}
+    local stat
     for stat in pairs(defaults) do allStats[stat] = true end
     for stat in pairs(saved) do allStats[stat] = true end
-    -- Le bonus d'armure doit toujours pouvoir être réglé à la main
     allStats["ARMOR BONUS"] = true
-    -- Valeur affichée pour chaque stat (ARMOR BONUS part du poids d'ARMOR tant qu'il n'a pas le sien)
     local vals = {}
     for stat in pairs(allStats) do
         local v = saved[stat]
@@ -563,183 +405,389 @@ function BuildEditBoxes()
         vals[stat] = v
     end
     editBaseline = vals
+    capBaseline = {}
+    for stat in pairs(allStats) do
+        local c = roleCaps[stat]
+        if c and tonumber(c.softCap) and tonumber(c.softCap) > 0 then
+            capBaseline[stat] = { tonumber(c.softCap), tonumber(c.postValue) or 0 }
+        else
+            capBaseline[stat] = { 0, 0 }
+        end
+    end
     if next(editBoxes) ~= nil then
         for stat, box in pairs(editBoxes) do
             local value = vals[stat]; if value == nil then value = 1.0 end
             box:SetText(tostring(value))
-            if box.opLabel then box.opLabel:SetText(StatLabel(stat)) end
+            local cb = capBaseline[stat] or { 0, 0 }
+            capBoxes[stat]:SetText(FmtNum(cb[1])); postBoxes[stat]:SetText(FmtNum(cb[2]))
         end
-        SyncCompactCheck()
+        ApplyCapsVisibility(); RefreshAllCapLabels()
+        if OctoPawn_RefreshCompareButton then OctoPawn_RefreshCompareButton() end
         return
     end
     local sortedStats = {}
     for stat in pairs(allStats) do table.insert(sortedStats, stat) end
     table.sort(sortedStats, function(a, b)
-        local va = vals[a]
-        local vb = vals[b]
+        local va, vb = vals[a], vals[b]
         if va ~= vb then return va > vb end
-        -- Même valeur : tri alphabétique sur le libellé affiché (pas sur la clé interne)
         local la, lb = StatLabel(a), StatLabel(b)
         if la ~= lb then return la < lb end
         return a < b
     end)
-    local y = -10
+    local y = -6
+    local _
     for _, stat in ipairs(sortedStats) do
-        local value = vals[stat]
-        local box = CreateFrame("EditBox", nil, scrollChild)
-        box:SetWidth(70); box:SetHeight(20); box:SetAutoFocus(false)
-        box:SetFontObject("GameFontHighlight"); box:SetText(tostring(value)); box:SetJustifyH("CENTER")
-        box:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", 10, y)
-        box:SetBackdrop({ bgFile = "Interface\\ChatFrame\\ChatFrameBackground", edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border", tile = true, tileSize = 8, edgeSize = 12 })
-        box:SetBackdropColor(0.1, 0.1, 0.1, 0.9); box:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
-        box:SetScript("OnTextChanged", function()
+        local wbox = MakeNumBox(scrollChild, COL_WEIGHT_X, y, 62)
+        wbox:SetText(tostring(vals[stat]))
+        wbox.opY = y; wbox.opStat = stat
+        local label = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+        label:SetPoint("TOPLEFT", scrollChild, "TOPLEFT", COL_LABEL_X, y - 3)
+        label:SetWidth(172); label:SetJustifyH("LEFT")
+        label:SetText(StatLabel(stat))
+        statLabels[stat] = label
+        local cb = capBaseline[stat]
+        local cbox = MakeNumBox(scrollChild, COL_CAP_X, y, 54)
+        cbox:SetText(FmtNum(cb[1])); cbox.opY = y
+        local pbox = MakeNumBox(scrollChild, COL_POST_X, y, 54)
+        pbox:SetText(FmtNum(cb[2])); pbox.opY = y
+        cbox.opStat = stat
+        cbox:SetScript("OnTextChanged", function()
             local text = this:GetText() or ""
             local clean = string.gsub(text, "[^0-9%.%-]", "")
-            if clean ~= text then this:SetText(clean) end
+            if clean ~= text then this:SetText(clean) return end
+            RefreshCapLabel(this.opStat)
+            UpdateWeightsTitle()
         end)
-        local label = scrollChild:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-        label:SetPoint("LEFT", box, "RIGHT", 12, 0)
-        label:SetText(StatLabel(stat))
-        box.opLabel = label
-        editBoxes[stat] = box
-        table.insert(orderedBoxes, box)
-        table.insert(createdFrames, box); table.insert(createdFrames, label)
+        editBoxes[stat] = wbox; capBoxes[stat] = cbox; postBoxes[stat] = pbox
+        wbox.opCap = cbox; cbox.opPost = pbox; pbox.opRowCap = cbox
+        table.insert(orderedBoxes, wbox)
+        table.insert(createdFrames, label)
         y = y - 28
     end
-    local function FocusNextBox(current)
-        current:HighlightText(0, 0)
-        for i, box in ipairs(orderedBoxes) do
-            if box == current then
-                local nextIndex = i + 1
-                if nextIndex > table.getn(orderedBoxes) then nextIndex = 1 end
-                local nextBox = orderedBoxes[nextIndex]
-                nextBox:SetFocus(); nextBox:HighlightText()
-                local _, _, _, _, yOfs = nextBox:GetPoint()
-                local targetScroll = -(yOfs or 0) - 10
-                if targetScroll < 0 then targetScroll = 0 end
-                local maxScroll = scrollFrame:GetVerticalScrollRange()
-                if targetScroll > maxScroll then targetScroll = maxScroll end
-                scrollFrame:SetVerticalScroll(targetScroll)
-                return
-            end
+    scrollChild:SetHeight(-y + 10)
+    -- Navigation Tab / Entrée : poids -> poids suivant ; cap -> after cap -> cap suivant
+    local n = table.getn(orderedBoxes)
+    local i
+    for i = 1, n do
+        local wbox = orderedBoxes[i]
+        local nextW = orderedBoxes[i + 1] or orderedBoxes[1]
+        local nextRowCap = capBoxes[nextW.opStat]
+        wbox.opNext = nextW
+        wbox.opNextCap = nextRowCap
+        local function goNext()
+            this:HighlightText(0, 0)
+            FocusBox(this.opNext)
         end
+        wbox:SetScript("OnTabPressed", goNext)
+        wbox:SetScript("OnEnterPressed", goNext)
+        local cbox = wbox.opCap
+        cbox.opNextCap = nextRowCap
+        cbox:SetScript("OnTabPressed", function() this:HighlightText(0, 0); FocusBox(this.opPost) end)
+        cbox:SetScript("OnEnterPressed", function() this:HighlightText(0, 0); FocusBox(this.opPost) end)
+        local pbox = cbox.opPost
+        pbox:SetScript("OnTabPressed", function() this:HighlightText(0, 0); FocusBox(this.opRowCap.opNextCap) end)
+        pbox:SetScript("OnEnterPressed", function() this:HighlightText(0, 0); FocusBox(this.opRowCap.opNextCap) end)
     end
-    for _, box in ipairs(orderedBoxes) do
-        box:SetScript("OnTabPressed", function() FocusNextBox(this) end)
-        box:SetScript("OnEnterPressed", function() FocusNextBox(this) end)
-    end
-    SyncCompactCheck()
+    ApplyCapsVisibility(); RefreshAllCapLabels()
+    if OctoPawn_RefreshCompareButton then OctoPawn_RefreshCompareButton() end
 end
 
-local saveBtn = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
-saveBtn:SetPoint("BOTTOM", configFrame, "BOTTOM", 0, 20)
-saveBtn:SetWidth(120); saveBtn:SetHeight(28); saveBtn:SetText("Save Weights")
-saveBtn:SetScript("OnClick", function()
-    SaveWeights(true); WipeEditBoxes(); BuildEditBoxes(); scrollFrame:SetVerticalScroll(0)
-    local role = (OctoPawnDB and OctoPawnDB.role) or "current"
-    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Saved as " .. role .. " (custom).|r")
-end)
-configFrame:SetScript("OnHide", function() SaveWeights() end)
+function BuildEditBoxes()
+    building = true
+    BuildImpl()
+    building = false
+    UpdateWeightsTitle()
+end
 
-local clearBtn = CreateFrame("Button", nil, configFrame, "UIPanelButtonTemplate")
-clearBtn:SetPoint("RIGHT", saveBtn, "LEFT", -10, 0)
-clearBtn:SetWidth(110); clearBtn:SetHeight(28); clearBtn:SetText("Clear Weights")
+local saveBtn = CreateFrame("Button", nil, weightsTab, "UIPanelButtonTemplate")
+saveBtn:SetPoint("BOTTOMRIGHT", weightsTab, "BOTTOMRIGHT", -8, 4)
+saveBtn:SetWidth(130); saveBtn:SetHeight(28); saveBtn:SetText("Save Weights")
+saveBtn:SetScript("OnClick", function()
+    SaveWeights(); WipeEditBoxes(); BuildEditBoxes(); scrollFrame:SetVerticalScroll(0)
+    local role = (OctoPawnDB and OctoPawnDB.role) or "current"
+    Msg("|cFF00FF00OctoPawn: Saved as " .. role .. " (custom).|r")
+    if OctoPawn_UpdatePlayerPaperScore then OctoPawn_UpdatePlayerPaperScore() end
+end)
+
+local clearBtn = CreateFrame("Button", nil, weightsTab, "UIPanelButtonTemplate")
+clearBtn:SetPoint("RIGHT", saveBtn, "LEFT", -8, 0)
+clearBtn:SetWidth(130); clearBtn:SetHeight(28); clearBtn:SetText("Clear Weights")
 clearBtn:SetScript("OnClick", function()
+    local stat, box
     for stat, box in pairs(editBoxes) do box:SetText("0") end
-    DEFAULT_CHAT_FRAME:AddMessage("|cFFFF9900OctoPawn: All weights set to 0 - click Save Weights to apply (use Profiles to reload a profile's default weights).|r")
+    Msg("|cFFFF9900OctoPawn: All weights set to 0 - click Save Weights to apply (pick a profile again to reload its weights).|r")
+end)
+
+copyBtn = CreateFrame("Button", nil, weightsTab, "UIPanelButtonTemplate")
+copyBtn:SetPoint("RIGHT", clearBtn, "LEFT", -8, 0)
+copyBtn:SetWidth(130); copyBtn:SetHeight(28); copyBtn:SetText("Copy from...")
+
+-- Fermer la fenêtre n'enregistre rien
+configFrame:SetScript("OnHide", function()
+    if CloseDropDownMenus then CloseDropDownMenus() end
+    if next(editBoxes) ~= nil and WeightsChanged() then
+        Msg("|cFFFF9900OctoPawn: Unsaved changes discarded.|r")
+    end
 end)
 
 function ToggleConfigFrame()
-    if configFrame:IsShown() then configFrame:Hide()
-    else BuildEditBoxes(); SyncCompactCheck(); configFrame:Show() end
+    if configFrame:IsShown() then
+        configFrame:Hide()
+    else
+        WipeEditBoxes(); BuildEditBoxes()
+        ShowTab("weights")
+        configFrame:Show()
+    end
 end
 
-function OctoPawn_ShowRolePicker()
-    if not rolePickerFrame then
-        rolePickerFrame = CreateFrame("Frame", "OctoPawnRolePicker", UIParent)
-        rolePickerFrame:SetWidth(380)
-        rolePickerFrame:SetHeight(360)
-        rolePickerFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
-        rolePickerFrame:SetBackdrop({
-            bgFile = "Interface\\DialogFrame\\UI-DialogBox-Background",
-            edgeFile = "Interface\\DialogFrame\\UI-DialogBox-Border",
-            tile = true, tileSize = 32, edgeSize = 32,
-            insets = { left = 8, right = 8, top = 8, bottom = 8 }
-        })
-        rolePickerFrame:SetFrameStrata("DIALOG")
-        rolePickerFrame:EnableMouse(true)
-        rolePickerFrame:SetMovable(true)
-        rolePickerFrame:RegisterForDrag("LeftButton")
-        rolePickerFrame:SetScript("OnDragStart", function() this:StartMoving() end)
-        rolePickerFrame:SetScript("OnDragStop", function() this:StopMovingOrSizing() end)
-        local pickerTitle = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontHighlightLarge")
-        pickerTitle:SetPoint("TOP", rolePickerFrame, "TOP", 0, -14)
-        pickerTitle:SetText("Choose Profile")
-        rolePickerFrame.title = pickerTitle
-        local hint = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-        hint:SetPoint("TOP", pickerTitle, "BOTTOM", 0, -4)
-        hint:SetTextColor(0.7, 0.7, 0.7)
-        hint:SetText("Tip = show this profile on item tooltips")
-        rolePickerFrame.hint = hint
-        rolePickerFrame.buttons = {}
+local function OpenConfig(tab)
+    if not configFrame:IsShown() then
+        WipeEditBoxes(); BuildEditBoxes()
+        configFrame:Show()
     end
+    ShowTab(tab or configFrame.currentTab or "weights")
+end
 
-    if rolePickerFrame.buttons then
-        local bi
-        for bi = 1, table.getn(rolePickerFrame.buttons) do
-            local b = rolePickerFrame.buttons[bi]
-            if b then b:Hide(); b:SetParent(nil) end
-        end
+-------------------------------------------------
+-- Onglet Options
+-------------------------------------------------
+local function MakeOption(name, y, label, desc, onClick)
+    local cb = CreateFrame("CheckButton", name, optionsTab, "UICheckButtonTemplate")
+    cb:SetWidth(24); cb:SetHeight(24)
+    cb:SetPoint("TOPLEFT", optionsTab, "TOPLEFT", 8, y)
+    cb:SetScript("OnClick", onClick)
+    local l = optionsTab:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    l:SetPoint("LEFT", cb, "RIGHT", 4, 0)
+    l:SetText(label)
+    local d = optionsTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    d:SetPoint("TOPLEFT", cb, "BOTTOMLEFT", 30, 2)
+    d:SetWidth(400); d:SetJustifyH("LEFT"); d:SetTextColor(0.7, 0.7, 0.7)
+    d:SetText(desc)
+    return cb
+end
+
+local compareCheck = MakeOption("OctoPawnCompareCheck", -10, "Show upgrade +/-",
+    "Compare an item with the gear you wear and show the score difference on tooltips.",
+    function()
+        if not OctoPawnDB then OctoPawnDB = {} end
+        OctoPawnDB.compareEnabled = this:GetChecked() and true or false
+    end)
+local compactCheck = MakeOption("OctoPawnCompactCheck", -70, "Compact tooltips",
+    "Show fewer lines in item tooltips.",
+    function()
+        if not OctoPawnDB then OctoPawnDB = {} end
+        OctoPawnDB.compactTooltips = this:GetChecked() and true or false
+    end)
+local ignoreEnchantsCheck = MakeOption("OctoPawnIgnoreEnchantsCheck", -130, "Ignore enchants",
+    "Do not count enchant bonuses when scoring items and totals.",
+    function()
+        if not OctoPawnDB then OctoPawnDB = {} end
+        OctoPawnDB.ignoreEnchants = this:GetChecked() and true or false
+    end)
+
+local function SyncCompareCheck()
+    if OctoPawnDB and OctoPawnDB.compareEnabled == false then compareCheck:SetChecked(0) else compareCheck:SetChecked(1) end
+end
+local function SyncCompactCheck()
+    if OctoPawnDB and OctoPawnDB.compactTooltips then compactCheck:SetChecked(1) else compactCheck:SetChecked(0) end
+end
+local function SyncIgnoreEnchantsCheck()
+    if OctoPawnDB and OctoPawnDB.ignoreEnchants then ignoreEnchantsCheck:SetChecked(1) else ignoreEnchantsCheck:SetChecked(0) end
+end
+compareCheck:SetScript("OnShow", SyncCompareCheck)
+compactCheck:SetScript("OnShow", SyncCompactCheck)
+ignoreEnchantsCheck:SetScript("OnShow", SyncIgnoreEnchantsCheck)
+function OctoPawn_RefreshCompareButton() SyncCompareCheck() end
+
+-------------------------------------------------
+-- Onglet Share
+-------------------------------------------------
+local shareHint = shareTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+shareHint:SetPoint("TOPLEFT", shareTab, "TOPLEFT", 4, -4)
+shareHint:SetWidth(430); shareHint:SetJustifyH("LEFT")
+shareHint:SetText("Sparse export - only stats that differ from the profile defaults (caps are not included).")
+
+local shareBox = CreateFrame("EditBox", "OctoPawnShareEditBox", shareTab)
+shareBox:SetPoint("TOPLEFT", shareTab, "TOPLEFT", 4, -26)
+shareBox:SetPoint("BOTTOMRIGHT", shareTab, "BOTTOMRIGHT", -4, 50)
+shareBox:SetMultiLine(true)
+shareBox:SetAutoFocus(false)
+shareBox:SetFontObject("GameFontHighlightSmall")
+shareBox:SetMaxLetters(2500)
+shareBox:SetBackdrop({
+    bgFile = "Interface\\ChatFrame\\ChatFrameBackground",
+    edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+    tile = true, tileSize = 8, edgeSize = 12,
+    insets = { left = 4, right = 4, top = 4, bottom = 4 },
+})
+shareBox:SetBackdropColor(0, 0, 0, 0.8)
+shareBox:SetBackdropBorderColor(0.7, 0.7, 0.7, 1)
+shareBox:SetTextInsets(6, 6, 6, 6)
+shareBox:SetScript("OnEscapePressed", function() this:ClearFocus() end)
+
+local exportBtn = CreateFrame("Button", nil, shareTab, "UIPanelButtonTemplate")
+exportBtn:SetWidth(110); exportBtn:SetHeight(26)
+exportBtn:SetPoint("BOTTOMLEFT", shareTab, "BOTTOMLEFT", 30, 8)
+exportBtn:SetText("Export")
+exportBtn:SetScript("OnClick", function()
+    if not OctoPawn_ExportWeightsSparse then return end
+    local s, err = OctoPawn_ExportWeightsSparse()
+    if not s then
+        Msg("|cFFFF0000OctoPawn: Export failed - " .. tostring(err) .. "|r")
+        return
     end
-    rolePickerFrame.buttons = {}
+    shareBox:SetText(s)
+    shareBox:HighlightText()
+    shareBox:SetFocus()
+    Msg("|cFF00FF00OctoPawn: Exported. Ctrl+C to copy.|r")
+end)
 
-    local class = nil
-    if OctoPawn_GetClass then class = OctoPawn_GetClass() end
+local importBtn = CreateFrame("Button", nil, shareTab, "UIPanelButtonTemplate")
+importBtn:SetWidth(110); importBtn:SetHeight(26)
+importBtn:SetPoint("BOTTOMRIGHT", shareTab, "BOTTOMRIGHT", -30, 8)
+importBtn:SetText("Import")
+importBtn:SetScript("OnClick", function()
+    if not OctoPawn_ImportWeightsSparse then return end
+    local ok, info = OctoPawn_ImportWeightsSparse(shareBox:GetText() or "")
+    if not ok then
+        Msg("|cFFFF0000OctoPawn: Import failed - " .. tostring(info) .. "|r")
+        return
+    end
+    Msg("|cFF00FF00OctoPawn: Imported weights for " .. tostring(info) .. " (custom).|r")
+    shareBox:SetText("")
+    WipeEditBoxes(); BuildEditBoxes()
+    ShowTab("weights")
+    if OctoPawn_UpdatePlayerPaperScore then OctoPawn_UpdatePlayerPaperScore() end
+end)
+shareTab:SetScript("OnShow", function() shareBox:SetText("") end)
+
+-------------------------------------------------
+-- Helpers classe / profils
+-------------------------------------------------
+local function PlayerClassSafe()
+    local class = OctoPawn_GetClass and OctoPawn_GetClass()
     if not class then
         local _, c = UnitClass("player")
         class = c or "WARRIOR"
     end
+    return class
+end
 
+local function RolesForClassSafe(class)
     local roles = {}
     if OctoPawn_GetRolesForClass then
         local ok, result = pcall(OctoPawn_GetRolesForClass, class)
         if ok and type(result) == "table" then roles = result end
     end
     if table.getn(roles) == 0 and defaultWeights and defaultWeights[class] then
+        local r, v
         for r, v in pairs(defaultWeights[class]) do
             if type(v) == "table" then table.insert(roles, r) end
         end
         table.sort(roles)
     end
-    if table.getn(roles) == 0 then
-        table.insert(roles, "Default")
+    if table.getn(roles) == 0 then table.insert(roles, "Default") end
+    return roles
+end
+
+-------------------------------------------------
+-- Copy from... (liste déroulante ; remplit les cases, puis Save Weights)
+-------------------------------------------------
+local function CopyFromRole(src)
+    local class = PlayerClassSafe()
+    local w = OctoPawn_GetWeightsForRole and OctoPawn_GetWeightsForRole(class, src) or {}
+    local c = OctoPawn_GetCapsForRole and OctoPawn_GetCapsForRole(src) or {}
+    local stat, box
+    for stat, box in pairs(editBoxes) do
+        local v = w[stat]
+        if v == nil and stat == "ARMOR BONUS" then v = w["ARMOR"] end
+        if v == nil then v = 0 end
+        box:SetText(tostring(v))
+        local cd = c[stat]
+        if cd and tonumber(cd.softCap) and tonumber(cd.softCap) > 0 then
+            capBoxes[stat]:SetText(FmtNum(cd.softCap)); postBoxes[stat]:SetText(FmtNum(cd.postValue))
+        else
+            capBoxes[stat]:SetText("0"); postBoxes[stat]:SetText("0")
+        end
     end
+    RefreshAllCapLabels()
+    UpdateWeightsTitle()
+    Msg("|cFF00FF00OctoPawn: Copied weights and caps from " .. tostring(src) .. " - click Save Weights to apply.|r")
+end
 
-    rolePickerFrame.title:SetText("OctoPawn - " .. tostring(class))
-
-    local y = -50
-    local buttonCount = 0
+local function CopyMenu_Initialize()
+    local class = PlayerClassSafe()
+    local roles = RolesForClassSafe(class)
+    local current = OctoPawnDB and OctoPawnDB.role
     local ri
-
-    local function Track(frame)
-        table.insert(rolePickerFrame.buttons, frame)
+    for ri = 1, table.getn(roles) do
+        local r = roles[ri]
+        if r ~= current then
+            local roleName = r
+            local info = {}
+            local custom = OctoPawn_HasCustomWeights and OctoPawn_HasCustomWeights(r)
+            if custom then info.text = r .. " (custom)" else info.text = r end
+            info.value = r
+            info.notCheckable = 1
+            info.func = function() CopyFromRole(roleName) end
+            UIDropDownMenu_AddButton(info, 1)
+        end
     end
+end
+
+copyBtn:SetScript("OnClick", function()
+    if not copyDD then
+        copyDD = CreateFrame("Frame", "OctoPawnCopyFromDropDown", UIParent, "UIDropDownMenuTemplate")
+    end
+    UIDropDownMenu_Initialize(copyDD, CopyMenu_Initialize, "MENU")
+    ToggleDropDownMenu(1, nil, copyDD, copyBtn, 0, 0)
+end)
+
+-------------------------------------------------
+-- Onglet "List of profiles" : Tip / supprimer / renommer / nouveau
+-------------------------------------------------
+local listHint
+local renameBox, renameOk
+
+local function ClearListItems()
+    local i
+    for i = 1, table.getn(listItems) do
+        local b = listItems[i]
+        if b then b:Hide(); b:SetParent(nil) end
+    end
+    listItems = {}
+end
+
+function OctoPawn_BuildProfileList()
+    if not listHint then
+        listHint = listTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        listHint:SetPoint("TOPLEFT", listTab, "TOPLEFT", 8, -4)
+        listHint:SetWidth(430); listHint:SetJustifyH("LEFT")
+        listHint:SetTextColor(0.7, 0.7, 0.7)
+        listHint:SetText("Click a profile to edit its weights.  Tip = show this profile on item tooltips.")
+    end
+    ClearListItems()
+
+    local class = PlayerClassSafe()
+    local roles = RolesForClassSafe(class)
+    local activeRole = OctoPawnDB and OctoPawnDB.role
+    local activeCustom = OctoPawnDB and OctoPawnDB.useCustom
+    local y = -28
+    local function Track(frame) table.insert(listItems, frame) end
 
     local function SelectRole(roleName, isCustom)
+        if WeightsChanged() then
+            Msg("|cFFFF9900OctoPawn: Unsaved changes discarded.|r")
+        end
         if OctoPawn_ApplyRole then OctoPawn_ApplyRole(roleName, isCustom) end
-        rolePickerFrame:Hide()
-        WipeEditBoxes()
-        if configFrame and configFrame:IsShown() then BuildEditBoxes() end
+        WipeEditBoxes(); BuildEditBoxes()
+        scrollFrame:SetVerticalScroll(0)
+        ShowTab("weights")
     end
 
-    -- Sections : profils par défaut d'abord, puis profils personnalisés.
-    -- Un profil par défaut modifié (poids sauvegardés sous le même nom) est un
-    -- profil personnalisé : il est listé dans "Custom profiles" et peut être renommé.
-    local rows = {}
-    local customRows = {}
-    local headerAt = {}
-    local headerCount = 0
+    local rows, customRows, headerAt = {}, {}, {}
     local nDefault = 0
+    local ri
     for ri = 1, table.getn(roles) do
         local r = roles[ri]
         local builtIn = OctoPawn_IsBuiltInRole and OctoPawn_IsBuiltInRole(class, r)
@@ -752,9 +800,7 @@ function OctoPawn_ShowRolePicker()
             table.insert(customRows, { role = r, kind = "custom" })
         end
     end
-    if nDefault > 0 then
-        headerAt[1] = { "Default profiles", 1, 0.82, 0 }
-    end
+    if nDefault > 0 then headerAt[1] = { "Default profiles", 1, 0.82, 0 } end
     if table.getn(customRows) > 0 then
         headerAt[nDefault + 1] = { "Custom profiles", 0.25, 1, 0.25 }
         for ri = 1, table.getn(customRows) do table.insert(rows, customRows[ri]) end
@@ -764,49 +810,48 @@ function OctoPawn_ShowRolePicker()
         local role = rows[ri].role
         local kind = rows[ri].kind
         local hasCustom = OctoPawn_HasCustomWeights and OctoPawn_HasCustomWeights(role)
-        -- Profil qui charge ses poids sauvegardés : dérivé d'un défaut, ou custom pur
         local loadCustom = (kind == "derived") or (kind == "custom" and hasCustom and true or false)
 
         if headerAt[ri] then
             if ri > 1 then y = y - 6 end
-            local hdr = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-            hdr:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 28, y)
+            local hdr = listTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            hdr:SetPoint("TOPLEFT", listTab, "TOPLEFT", 12, y)
             hdr:SetText(headerAt[ri][1])
             hdr:SetTextColor(headerAt[ri][2], headerAt[ri][3], headerAt[ri][4])
             Track(hdr)
             y = y - 18
-            headerCount = headerCount + 1
         end
 
-        local btn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-        btn:SetWidth(180)
-        btn:SetHeight(26)
-        btn:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 24, y)
-        if kind == "default" then
-            btn:SetText(role)
-        elseif kind == "derived" then
-            btn:SetText("|cff40ff40" .. role .. " (custom)|r")
-        else
-            btn:SetText("|cff40ff40" .. role .. "|r")
-        end
+        local btn = CreateFrame("Button", nil, listTab, "UIPanelButtonTemplate")
+        btn:SetWidth(240); btn:SetHeight(26)
+        btn:SetPoint("TOPLEFT", listTab, "TOPLEFT", 8, y)
         btn.roleName = role
-        btn:SetScript("OnClick", function()
-            SelectRole(this.roleName, loadCustom)
-        end)
+        btn:SetScript("OnClick", function() SelectRole(this.roleName, loadCustom) end)
         Track(btn)
 
-        -- Case Tip : le profil dérivé n'en a pas, elle reste sur la ligne du profil
-        -- par défaut (le drapeau Tip est lié au nom du profil)
+        -- Profil actif : "(current)" dans le nom du bouton
+        local isCurrent = false
+        if activeRole == role then
+            if kind == "default" then isCurrent = not activeCustom
+            elseif kind == "derived" then isCurrent = activeCustom and true or false
+            else isCurrent = true end
+        end
+        local label
+        if kind == "default" then label = role
+        elseif kind == "derived" then label = "|cff40ff40" .. role .. " (custom)|r"
+        else label = "|cff40ff40" .. role .. "|r" end
+        if isCurrent then label = label .. " |cff40ff40(current)|r" end
+        btn:SetText(label)
+
+        -- Tip : colonne fixe
         if kind ~= "derived" then
-            local tip = CreateFrame("CheckButton", nil, rolePickerFrame, "UICheckButtonTemplate")
+            local tip = CreateFrame("CheckButton", nil, listTab, "UICheckButtonTemplate")
             tip:SetWidth(24); tip:SetHeight(24)
-            tip:SetPoint("LEFT", btn, "RIGHT", 4, 0)
+            tip:SetPoint("TOPLEFT", listTab, "TOPLEFT", 250, y - 1)
             tip.roleName = role
             if OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role) then tip:SetChecked(1) else tip:SetChecked(0) end
             tip:SetScript("OnClick", function()
-                if OctoPawn_SetTipSpec then
-                    OctoPawn_SetTipSpec(this.roleName, this:GetChecked() and true or false)
-                end
+                if OctoPawn_SetTipSpec then OctoPawn_SetTipSpec(this.roleName, this:GetChecked() and true or false) end
             end)
             tip:SetScript("OnEnter", function()
                 GameTooltip:SetOwner(this, "ANCHOR_RIGHT")
@@ -816,28 +861,26 @@ function OctoPawn_ShowRolePicker()
             end)
             tip:SetScript("OnLeave", function() GameTooltip:Hide() end)
             Track(tip)
-
-            local tipLbl = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+            local tipLbl = listTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
             tipLbl:SetPoint("LEFT", tip, "RIGHT", 0, 0)
             tipLbl:SetText("Tip")
             Track(tipLbl)
         end
 
-        -- X (supprimer) et Rename : profils personnalisés uniquement, y compris
-        -- ceux dérivés d'un profil par défaut. Ancrage commun pour l'alignement.
         if kind ~= "default" and hasCustom then
-            local del = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
+            local del = CreateFrame("Button", nil, listTab, "UIPanelButtonTemplate")
             del:SetWidth(28); del:SetHeight(24)
-            del:SetPoint("LEFT", btn, "RIGHT", 52, 0)
+            del:SetPoint("TOPLEFT", listTab, "TOPLEFT", 304, y - 1)
             del:SetText("X")
             del.roleName = role
             del:SetScript("OnClick", function()
                 local ok, err = OctoPawn_DeleteCustomSpec and OctoPawn_DeleteCustomSpec(this.roleName)
                 if ok then
-                    DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Deleted custom '" .. tostring(this.roleName) .. "'.|r")
-                    OctoPawn_ShowRolePicker()
+                    Msg("|cFF00FF00OctoPawn: Deleted custom '" .. tostring(this.roleName) .. "'.|r")
+                    WipeEditBoxes(); BuildEditBoxes()
+                    OctoPawn_BuildProfileList()
                 else
-                    DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: " .. tostring(err or "delete failed") .. "|r")
+                    Msg("|cFFFF0000OctoPawn: " .. tostring(err or "delete failed") .. "|r")
                 end
             end)
             del:SetScript("OnEnter", function()
@@ -853,124 +896,130 @@ function OctoPawn_ShowRolePicker()
             del:SetScript("OnLeave", function() GameTooltip:Hide() end)
             Track(del)
 
-            local ren = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-            ren:SetWidth(58); ren:SetHeight(24)
+            local ren = CreateFrame("Button", nil, listTab, "UIPanelButtonTemplate")
+            ren:SetWidth(64); ren:SetHeight(24)
             ren:SetPoint("LEFT", del, "RIGHT", 2, 0)
             ren:SetText("Rename")
             ren.roleName = role
             ren:SetScript("OnClick", function()
-                if rolePickerFrame.renameBox then
-                    rolePickerFrame.renameBox:Show()
-                    rolePickerFrame.renameBox:SetText(this.roleName)
-                    rolePickerFrame.renameBox.oldName = this.roleName
-                    rolePickerFrame.renameBox:SetFocus()
-                end
+                renameBox:Show()
+                renameBox:SetText(this.roleName)
+                renameBox.oldName = this.roleName
+                renameBox:SetFocus()
             end)
             Track(ren)
         end
-
-        y = y - 30
-        buttonCount = buttonCount + 1
+        y = y - 28
     end
 
-    y = y - 6
-    local newLbl = rolePickerFrame:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
-    newLbl:SetPoint("TOPLEFT", rolePickerFrame, "TOPLEFT", 28, y)
+    -- Nouveau profil
+    y = y - 10
+    local newLbl = listTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+    newLbl:SetPoint("TOPLEFT", listTab, "TOPLEFT", 12, y - 4)
     newLbl:SetText("New profile:")
     Track(newLbl)
 
-    local newBox = CreateFrame("EditBox", "OctoPawnNewSpecBox", rolePickerFrame)
-    newBox:SetWidth(120); newBox:SetHeight(22)
-    newBox:SetPoint("LEFT", newLbl, "RIGHT", 6, 0)
+    local newBox = CreateFrame("EditBox", "OctoPawnNewSpecBox", listTab)
+    newBox:SetWidth(140); newBox:SetHeight(22)
+    newBox:SetPoint("LEFT", newLbl, "RIGHT", 8, 0)
     newBox:SetAutoFocus(false)
     newBox:SetFontObject(GameFontHighlight)
     newBox:SetText("")
-    if newBox.SetBackdrop then
-        newBox:SetBackdrop({
-            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-            tile = true, tileSize = 8, edgeSize = 8,
-            insets = { left = 2, right = 2, top = 2, bottom = 2 }
-        })
-        newBox:SetBackdropColor(0, 0, 0, 0.8)
-    end
+    newBox:SetTextInsets(4, 4, 0, 0)
+    newBox:SetBackdrop({
+        bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 8, edgeSize = 8,
+        insets = { left = 2, right = 2, top = 2, bottom = 2 }
+    })
+    newBox:SetBackdropColor(0, 0, 0, 0.8)
+    newBox:SetScript("OnEscapePressed", function() this:ClearFocus() end)
     Track(newBox)
 
-    local newBtn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-    newBtn:SetWidth(50); newBtn:SetHeight(24)
-    newBtn:SetPoint("LEFT", newBox, "RIGHT", 4, 0)
+    local newBtn = CreateFrame("Button", nil, listTab, "UIPanelButtonTemplate")
+    newBtn:SetWidth(60); newBtn:SetHeight(24)
+    newBtn:SetPoint("LEFT", newBox, "RIGHT", 6, 0)
     newBtn:SetText("Add")
     newBtn:SetScript("OnClick", function()
         local name = newBox:GetText() or ""
         local ok, err = OctoPawn_CreateCustomSpec and OctoPawn_CreateCustomSpec(name)
         if ok then
-            DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Created profile '" .. name .. "'.|r")
+            Msg("|cFF00FF00OctoPawn: Created profile '" .. name .. "'.|r")
             newBox:SetText("")
-            OctoPawn_ShowRolePicker()
+            OctoPawn_BuildProfileList()
         else
-            DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: " .. tostring(err or "create failed") .. "|r")
+            Msg("|cFFFF0000OctoPawn: " .. tostring(err or "create failed") .. "|r")
         end
     end)
     Track(newBtn)
-    y = y - 28
 
-    if not rolePickerFrame.renameBox then
-        local rb = CreateFrame("EditBox", "OctoPawnRenameSpecBox", rolePickerFrame)
-        rb:SetWidth(140); rb:SetHeight(22)
-        rb:SetPoint("BOTTOM", rolePickerFrame, "BOTTOM", -30, 36)
-        rb:SetAutoFocus(false)
-        rb:SetFontObject(GameFontHighlight)
-        rb:Hide()
-        if rb.SetBackdrop then
-            rb:SetBackdrop({
-                bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
-                edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-                tile = true, tileSize = 8, edgeSize = 8,
-                insets = { left = 2, right = 2, top = 2, bottom = 2 }
-            })
-            rb:SetBackdropColor(0, 0, 0, 0.9)
-        end
-        rolePickerFrame.renameBox = rb
-        local rok = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-        rok:SetWidth(50); rok:SetHeight(24)
-        rok:SetPoint("LEFT", rb, "RIGHT", 4, 0)
-        rok:SetText("OK")
-        rok:SetScript("OnClick", function()
-            local old = rb.oldName
-            local newn = rb:GetText() or ""
+    -- Zone de renommage (créée une seule fois, en bas de l'onglet)
+    if not renameBox then
+        renameBox = CreateFrame("EditBox", "OctoPawnRenameSpecBox", listTab)
+        renameBox:SetWidth(160); renameBox:SetHeight(22)
+        renameBox:SetPoint("BOTTOMLEFT", listTab, "BOTTOMLEFT", 70, 10)
+        renameBox:SetAutoFocus(false)
+        renameBox:SetFontObject(GameFontHighlight)
+        renameBox:SetTextInsets(4, 4, 0, 0)
+        renameBox:SetBackdrop({
+            bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+            edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+            tile = true, tileSize = 8, edgeSize = 8,
+            insets = { left = 2, right = 2, top = 2, bottom = 2 }
+        })
+        renameBox:SetBackdropColor(0, 0, 0, 0.9)
+        renameBox:SetScript("OnEscapePressed", function() this:ClearFocus(); this:Hide() end)
+        renameBox:Hide()
+        local rlbl = listTab:CreateFontString(nil, "OVERLAY", "GameFontNormalSmall")
+        rlbl:SetPoint("RIGHT", renameBox, "LEFT", -6, 0)
+        rlbl:SetText("Rename to:")
+        renameOk = CreateFrame("Button", nil, listTab, "UIPanelButtonTemplate")
+        renameOk:SetWidth(50); renameOk:SetHeight(24)
+        renameOk:SetPoint("LEFT", renameBox, "RIGHT", 6, 0)
+        renameOk:SetText("OK")
+        renameOk:SetScript("OnClick", function()
+            local old = renameBox.oldName
+            local newn = renameBox:GetText() or ""
             local ok, err = OctoPawn_RenameCustomSpec and OctoPawn_RenameCustomSpec(old, newn)
             if ok then
-                DEFAULT_CHAT_FRAME:AddMessage("|cFF00FF00OctoPawn: Renamed to '" .. newn .. "'.|r")
-                rb:Hide(); rok:Hide()
-                OctoPawn_ShowRolePicker()
+                Msg("|cFF00FF00OctoPawn: Renamed to '" .. newn .. "'.|r")
+                renameBox:Hide()
+                WipeEditBoxes(); BuildEditBoxes()
+                OctoPawn_BuildProfileList()
             else
-                DEFAULT_CHAT_FRAME:AddMessage("|cFFFF0000OctoPawn: " .. tostring(err or "rename failed") .. "|r")
+                Msg("|cFFFF0000OctoPawn: " .. tostring(err or "rename failed") .. "|r")
             end
         end)
-        rok:Hide()
-        rolePickerFrame.renameOk = rok
-        rb:SetScript("OnShow", function() if rolePickerFrame.renameOk then rolePickerFrame.renameOk:Show() end end)
-        rb:SetScript("OnHide", function() if rolePickerFrame.renameOk then rolePickerFrame.renameOk:Hide() end end)
+        renameOk:Hide()
+        renameBox:SetScript("OnShow", function() renameOk:Show(); rlbl:Show() end)
+        renameBox:SetScript("OnHide", function() renameOk:Hide(); rlbl:Hide() end)
+        rlbl:Hide()
     else
-        rolePickerFrame.renameBox:Hide()
-        if rolePickerFrame.renameOk then rolePickerFrame.renameOk:Hide() end
+        renameBox:Hide()
     end
+end
 
-    local closeBtn = CreateFrame("Button", nil, rolePickerFrame, "UIPanelButtonTemplate")
-    closeBtn:SetWidth(80); closeBtn:SetHeight(24)
-    closeBtn:SetPoint("BOTTOM", rolePickerFrame, "BOTTOM", 0, 12)
-    closeBtn:SetText("Close")
-    closeBtn:SetScript("OnClick", function() rolePickerFrame:Hide() end)
-    Track(closeBtn)
+function OctoPawn_ShowRolePicker()
+    OpenConfig("list")
+end
 
-    local height = 100 + (buttonCount * 30) + (headerCount * 24) + 60
-    if height < 200 then height = 200 end
-    if height > 520 then height = 520 end
-    rolePickerFrame:SetHeight(height)
-    rolePickerFrame:Show()
+-------------------------------------------------
+-- Points d'entrée conservés (compatibilité)
+-------------------------------------------------
+function ToggleShareFrame()
+    if configFrame:IsShown() and configFrame.currentTab == "share" then
+        configFrame:Hide()
+    else
+        OpenConfig("share")
+    end
+end
+
+function ToggleAdvancedFrame()
+    if not OctoPawnDB then OctoPawnDB = {} end
+    OctoPawnDB.showCaps = true
+    OpenConfig("weights")
+    ApplyCapsVisibility(); RefreshAllCapLabels()
 end
 
 function OctoPawn_OnDBReady() end
 print("|cFF00FF00OctoPawn|r UI loaded")
-
-
