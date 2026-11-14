@@ -74,6 +74,14 @@ function OctoPawn_HasCustomWeights(role)
         and next(OctoPawnDB.customWeights[role]) ~= nil
 end
 
+-- Caps d'un profil : { [stat] = { softCap = X, postValue = Y } } (table vide si aucun)
+function OctoPawn_GetCapsForRole(role)
+    if not role or not OctoPawnDB or type(OctoPawnDB.caps) ~= "table" then return {} end
+    local c = OctoPawnDB.caps[role]
+    if type(c) ~= "table" then return {} end
+    return c
+end
+
 function OctoPawn_IsTipSpec(role)
     if not role or not OctoPawnDB then return false end
     if type(OctoPawnDB.tipSpecs) ~= "table" then return false end
@@ -106,6 +114,7 @@ function OctoPawn_DeleteCustomSpec(role)
         return false, "No custom weights for " .. tostring(role)
     end
     OctoPawnDB.customWeights[role] = nil
+    if OctoPawnDB.caps then OctoPawnDB.caps[role] = nil end
     if OctoPawnDB.tipSpecs then OctoPawnDB.tipSpecs[role] = nil end
     local class = OctoPawn_GetClass and OctoPawn_GetClass()
     local wasBuiltIn = OctoPawn_IsBuiltInRole(class, role)
@@ -153,6 +162,10 @@ function OctoPawn_RenameCustomSpec(oldName, newName)
     end
     OctoPawnDB.customWeights[newName] = data
     OctoPawnDB.customWeights[oldName] = nil
+    if OctoPawnDB.caps and OctoPawnDB.caps[oldName] then
+        OctoPawnDB.caps[newName] = OctoPawnDB.caps[oldName]
+        OctoPawnDB.caps[oldName] = nil
+    end
     if OctoPawnDB.tipSpecs and OctoPawnDB.tipSpecs[oldName] then
         OctoPawnDB.tipSpecs[newName] = true
         OctoPawnDB.tipSpecs[oldName] = nil
@@ -184,6 +197,16 @@ function OctoPawn_CreateCustomSpec(name)
     local k, v
     for k, v in pairs(src) do
         OctoPawnDB.customWeights[name][k] = v
+    end
+    -- Le nouveau profil reprend aussi les caps du profil actif
+    if type(OctoPawnDB.caps) ~= "table" then OctoPawnDB.caps = {} end
+    local srcCaps = OctoPawn_GetCapsForRole(OctoPawnDB.role)
+    if next(srcCaps) then
+        OctoPawnDB.caps[name] = {}
+        local cs, cd
+        for cs, cd in pairs(srcCaps) do
+            OctoPawnDB.caps[name][cs] = { softCap = cd.softCap, postValue = cd.postValue }
+        end
     end
     if not next(OctoPawnDB.customWeights[name]) then
         local base = OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights() or {}
@@ -373,7 +396,21 @@ initFrame:SetScript("OnEvent", function()
         if type(OctoPawnDB.weights) ~= "table" then OctoPawnDB.weights = {} end
         if type(OctoPawnDB.customWeights) ~= "table" then OctoPawnDB.customWeights = {} end
         if type(OctoPawnDB.inspectRole) ~= "table" then OctoPawnDB.inspectRole = {} end
-        if type(OctoPawnDB.dr) ~= "table" then OctoPawnDB.dr = {} end
+        if type(OctoPawnDB.caps) ~= "table" then OctoPawnDB.caps = {} end
+        -- Migration unique : anciens caps globaux (OctoPawnDB.dr) -> caps du profil actif
+        if type(OctoPawnDB.dr) == "table" then
+            if OctoPawnDB.role and not next(OctoPawnDB.caps[OctoPawnDB.role] or {}) then
+                local moved = {}
+                local ms, md
+                for ms, md in pairs(OctoPawnDB.dr) do
+                    if type(md) == "table" and tonumber(md.softCap) and tonumber(md.softCap) > 0 and tonumber(md.postValue) then
+                        moved[ms] = { softCap = md.softCap, postValue = md.postValue }
+                    end
+                end
+                if next(moved) then OctoPawnDB.caps[OctoPawnDB.role] = moved end
+            end
+            OctoPawnDB.dr = nil
+        end
         if type(OctoPawnDB.defaultOverrides) ~= "table" then OctoPawnDB.defaultOverrides = {} end
         if type(OctoPawnDB.tipSpecs) ~= "table" then OctoPawnDB.tipSpecs = {} end
         if OctoPawnDB.compactTooltips == nil then OctoPawnDB.compactTooltips = false end
@@ -418,5 +455,3 @@ initFrame:SetScript("OnEvent", function()
 end)
 
 print("|cFF00FF00OctoPawn|r core loaded")
-
-
