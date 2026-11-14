@@ -48,7 +48,7 @@ end
 local function ScoreUnitQuiet(unit, weights)
     if not unit or not UnitExists(unit) then return 0 end
     if OctoPawn_ScoreUnitEquipped then
-        return OctoPawn_ScoreUnitEquipped(unit, weights) or 0
+        return OctoPawn_ScoreUnitEquipped(unit, weights, weights and {} or nil) or 0
     end
     return 0
 end
@@ -286,3 +286,4 @@ end)
 
 TryHookAll()
 print("|cFF00FF00OctoPawn|r paperdoll loaded")
+
