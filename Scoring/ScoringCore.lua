@@ -2,20 +2,28 @@
 -- OctoPawn Scoring/ScoringCore.lua
 -------------------------------------------------
 
--- Caps GLOBAUX (sur le total de l'équipement porté) :
+-- Caps PAR PROFIL (sur le total de l'équipement porté) :
+--   OctoPawnDB.caps[profil][stat] = { softCap = X, postValue = Y }
 --   softCap   = plafond de la stat (ex. 9 pour 9 % de hit)
 --   postValue = valeur par point AU-DELÀ du plafond (remplace le poids du profil)
--- Aucun cap par défaut : à définir dans la fenêtre "Soft Caps".
-local DEFAULT_DR = {}
-
+-- Aucun cap par défaut : à définir dans l'onglet Weights (case "Show caps").
 function OctoPawn_GetDefaultDR()
-    return DEFAULT_DR
+    return {}
+end
+
+-- caps nil = caps du profil actif
+local function ResolveCaps(caps)
+    if caps then return caps end
+    if OctoPawn_GetCapsForRole and OctoPawnDB then
+        return OctoPawn_GetCapsForRole(OctoPawnDB.role) or {}
+    end
+    return {}
 end
 
 -- Renvoie la config de cap d'une stat, ou nil si pas de cap actif
--- (les anciennes entrées { softCap, postScale } sans postValue sont ignorées)
-function OctoPawn_GetDR(stat)
-    local d = OctoPawnDB and OctoPawnDB.dr and OctoPawnDB.dr[stat]
+function OctoPawn_GetDR(stat, caps)
+    caps = ResolveCaps(caps)
+    local d = caps[stat]
     if not d then return nil end
     local cap = tonumber(d.softCap)
     local post = tonumber(d.postValue)
@@ -24,8 +32,8 @@ function OctoPawn_GetDR(stat)
 end
 
 -- Valeur d'un total "total" pour une stat : poids jusqu'au cap, postValue au-delà
-local function CapValue(stat, total, weight)
-    local d = OctoPawn_GetDR(stat)
+local function CapValue(stat, total, weight, caps)
+    local d = OctoPawn_GetDR(stat, caps)
     if not d then return total * weight end
     local cap = tonumber(d.softCap)
     local post = tonumber(d.postValue)
@@ -33,11 +41,16 @@ local function CapValue(stat, total, weight)
     return cap * weight + (total - cap) * post
 end
 
+-- Vrai si au moins un profil possède un cap (sinon inutile de scanner l'équipement)
 local function HasCaps()
-    if not (OctoPawnDB and OctoPawnDB.dr) then return false end
-    local stat
-    for stat in pairs(OctoPawnDB.dr) do
-        if OctoPawn_GetDR(stat) then return true end
+    if not (OctoPawnDB and type(OctoPawnDB.caps) == "table") then return false end
+    local role, caps, stat
+    for role, caps in pairs(OctoPawnDB.caps) do
+        if type(caps) == "table" then
+            for stat in pairs(caps) do
+                if OctoPawn_GetDR(stat, caps) then return true end
+            end
+        end
     end
     return false
 end
@@ -47,7 +60,7 @@ end
 --   false = aucun cap (utilisé pour les scans internes)
 --   table = totaux fournis par l'appelant
 -- Renvoie : score, results, totals (stats brutes de l'objet)
-function OctoPawn_ScoreTooltip(tooltip, overrideWeights, baseTotals)
+function OctoPawn_ScoreTooltip(tooltip, overrideWeights, baseTotals, caps)
     local weights = overrideWeights
     if not weights then
         weights = (OctoPawnDB and OctoPawnDB.weights) or (OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights()) or {}
@@ -160,13 +173,13 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights, baseTotals)
     if baseTotals == nil and OctoPawn_AutoBase then
         baseTotals = OctoPawn_AutoBase(tooltip)
     end
-    local score, results = OctoPawn_ScoreTotals(totals, weights, baseTotals or nil)
+    local score, results = OctoPawn_ScoreTotals(totals, weights, baseTotals or nil, caps)
     return score, results, totals
 end
 
 -- Score d'un jeu de totaux de stats, avec caps évalués sur (base + totals)
 -- Le gain d'une stat = valeur(base + totals) - valeur(base)
-function OctoPawn_ScoreTotals(totals, overrideWeights, base)
+function OctoPawn_ScoreTotals(totals, overrideWeights, base, caps)
     local weights = overrideWeights
     if not weights then
         weights = (OctoPawnDB and OctoPawnDB.weights) or (OctoPawn_GetDefaultWeights and OctoPawn_GetDefaultWeights()) or {}
@@ -182,7 +195,7 @@ function OctoPawn_ScoreTotals(totals, overrideWeights, base)
         end
         if weight == nil then weight = 1.0 end
         local b = (base and base[stat]) or 0
-        local contribution = CapValue(stat, b + value, weight) - CapValue(stat, b, weight)
+        local contribution = CapValue(stat, b + value, weight, caps) - CapValue(stat, b, weight, caps)
         local effective = value
         if weight ~= 0 then effective = contribution / weight end
         totalScore = totalScore + contribution
@@ -275,7 +288,7 @@ function OctoPawn_AutoBase(tooltip)
     return OctoPawn_BaseExcluding(chosen)
 end
 
-function OctoPawn_ScoreUnitEquipped(unit, weights)
+function OctoPawn_ScoreUnitEquipped(unit, weights, caps)
     if not unit or not UnitExists(unit) then return 0 end
     local tip = GetScanTooltip()
     local merged = {}
@@ -296,7 +309,7 @@ function OctoPawn_ScoreUnitEquipped(unit, weights)
         end
     end
     -- Les caps s'appliquent au total de l'équipement inspecté
-    local total = OctoPawn_ScoreTotals(merged, weights, nil)
+    local total = OctoPawn_ScoreTotals(merged, weights, nil, caps)
     return total
 end
 
@@ -355,7 +368,7 @@ local SHORT_SLOT_LABEL = {
 
 -- Return list of {score, diff, label, slot} for every equipped item in the slot set
 -- diff = score de l'objet survolé - score de l'objet équipé, caps évalués sans l'objet équipé
-local function EquippedScoresForSlots(slots, weights, candTotals)
+local function EquippedScoresForSlots(slots, weights, candTotals, caps)
     if not slots then return nil end
     local list = {}
     local s
@@ -363,8 +376,8 @@ local function EquippedScoresForSlots(slots, weights, candTotals)
         if GetInventoryItemLink("player", s) then
             local eqTotals = OctoPawn_SlotTotals(s) or {}
             local base = OctoPawn_BaseExcluding(s)
-            local eqScore = OctoPawn_ScoreTotals(eqTotals, weights, base)
-            local cScore = OctoPawn_ScoreTotals(candTotals or {}, weights, base)
+            local eqScore = OctoPawn_ScoreTotals(eqTotals, weights, base, caps)
+            local cScore = OctoPawn_ScoreTotals(candTotals or {}, weights, base, caps)
             table.insert(list, { score = eqScore or 0, diff = (cScore or 0) - (eqScore or 0), label = SHORT_SLOT_LABEL[s], slot = s })
         end
     end
@@ -387,10 +400,11 @@ local function AddAllSpecsToTooltip(tooltip)
         local show = OctoPawn_IsTipSpec and OctoPawn_IsTipSpec(role)
         if show then
             local weights = OctoPawn_GetWeightsForRole and OctoPawn_GetWeightsForRole(class, role) or {}
-            local score = OctoPawn_ScoreTooltip(tooltip, weights) or 0
+            local roleCaps = OctoPawn_GetCapsForRole and OctoPawn_GetCapsForRole(role) or {}
+            local score = OctoPawn_ScoreTooltip(tooltip, weights, nil, roleCaps) or 0
             local line = string.format("%s: |cFFFFFFFF%.1f|r", role, score)
             if compareOn and slots then
-                local eqList = EquippedScoresForSlots(slots, weights, candTotals)
+                local eqList = EquippedScoresForSlots(slots, weights, candTotals, roleCaps)
                 if eqList then
                     local ei
                     for ei = 1, table.getn(eqList) do
@@ -762,7 +776,3 @@ if GameTooltip.SetTradeSkillItem then hook("SetTradeSkillItem") end
 if GameTooltip.SetCraftItem then hook("SetCraftItem") end
 
 print("|cFF00FF00OctoPawn|r scoring core loaded")
-
-
-
-
