@@ -80,6 +80,11 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights, baseTotals, caps)
                 local isChanceOnHit = string.find(upper, "CHANCE ON HIT") ~= nil
                 local isThorns = string.find(upper, "TO THE ATTACKER") ~= nil
                 local isMeleeBonus = string.find(upper, "DAMAGE TO YOUR MELEE ATTACKS") ~= nil
+                -- Lignes "Allows X% of your Mana/Health regeneration to ..." : ne comptent que pour leur stat dédiée
+                -- (sinon le "Mana"/"Health" de la phrase serait compté en plus comme MANA / HEALTH bruts)
+                -- Lignes "... health/mana per 5 sec" : comptent pour HEALTH PER 5 / MANA PER 5, pas en plus comme HEALTH / MANA bruts
+                local isPer5 = (string.find(upper, "HEALTH PER 5") or string.find(upper, "MANA PER 5")) ~= nil
+                local isRegenPct = (string.find(upper, "REGENERATION TO CONTINUE WHILE CASTING") or string.find(upper, "REGENERATION TO WORK WHILE IN COMBAT")) ~= nil
                 -- Option "Ignore enchants" : on saute les lignes d'enchant
                 -- (la ligne 1 est le nom de l'objet, vert sur les objets inhabituels)
                 local isEnchant = false
@@ -99,6 +104,8 @@ function OctoPawn_ScoreTooltip(tooltip, overrideWeights, baseTotals, caps)
                                 if string.find(upper, entry.pattern) and not matchedThisLine[entry.stat] then
                                     local skip = false
                                     if (isThorns and entry.stat ~= "THORNS") or (isMeleeBonus and entry.stat ~= "MAGIC MELEE DMG") then skip = true  -- ligne de dégâts renvoyés : ne compte que pour THORNS (pas comme dégâts de sorts)
+                                    elseif isRegenPct and entry.stat ~= "CASTING REGEN" and entry.stat ~= "COMBAT HEALTH REG" then skip = true
+                                    elseif isPer5 and (entry.stat == "HEALTH" or entry.stat == "MANA") then skip = true
                                     elseif entry.stat == "HIT" and isChanceOnHit then skip = true
                                     elseif entry.stat == "HIT" and string.find(upper, "SPELL") then skip = true
                                     elseif isChanceOnHit and (entry.stat == "HIT" or entry.stat == "CRIT"
@@ -776,3 +783,4 @@ if GameTooltip.SetTradeSkillItem then hook("SetTradeSkillItem") end
 if GameTooltip.SetCraftItem then hook("SetCraftItem") end
 
 print("|cFF00FF00OctoPawn|r scoring core loaded")
+
