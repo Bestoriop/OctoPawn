@@ -28,11 +28,11 @@ OctoPawn reads the stats on gear and gives you a clear **OP Score** so you can q
 You can also open the full config window from the minimap button.
 
 Here is how it looks :
+<img width="676" height="766" alt="image" src="https://github.com/user-attachments/assets/a0518269-1e0d-4e14-a477-a900a26fdcef" />
+<img width="677" height="760" alt="image" src="https://github.com/user-attachments/assets/617600c5-3f93-4a80-8f6e-ceb4e0d09f8d" />
+<img width="237" height="290" alt="image" src="https://github.com/user-attachments/assets/4abe1635-c204-440d-b03a-090af3158640" />
 
-<img width="500" height="597" alt="image" src="https://github.com/user-attachments/assets/ff879f31-2a6d-4aa2-96ae-c0444090a83c" />
-<img width="452" height="535" alt="image" src="https://github.com/user-attachments/assets/47ec8e8d-9ebb-494e-85a8-a35df7d2acb7" />
 
-<img width="246" height="246" alt="image" src="https://github.com/user-attachments/assets/381f4f58-7d65-4c91-9a7a-ec0579abaedc" />
 
 ### Installation
 
