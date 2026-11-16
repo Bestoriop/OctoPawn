@@ -98,6 +98,8 @@ OctoPawn_StatPatterns = {
     { pattern = "SPELL DAMAGE",          stat = "SPELL DAMAGE" },
     { pattern = "SPELL POWER",           stat = "SPELL POWER" },
     { pattern = "SPELL CRIT",            stat = "SPELL CRIT" },
+    { pattern = "HEALTH REGENERATION TO WORK WHILE IN COMBAT", stat = "COMBAT HEALTH REG" },  -- "Equip: Allows 2% of your Health regeneration to work while in combat."
+    { pattern = "HEALTH REGENERATION TO WORK",                 stat = "COMBAT HEALTH REG" },
     { pattern = "HEALTH PER 5",          stat = "HEALTH PER 5" },
     { pattern = "MANA PER 5",            stat = "MANA PER 5" },
     { pattern = "MANA REGENERATION TO CONTINUE WHILE CASTING", stat = "CASTING REGEN" },
@@ -146,8 +148,18 @@ OctoPawn_StatPatterns = {
 }
 
 function OctoPawn_ExtractNumberNearStat(line, upper, pattern)
-    local startPos = string.find(upper, pattern)
+    local startPos, endPos = string.find(upper, pattern)
     if not startPos then return nil end
+    -- "... mana per 5 sec" : le "5" fait partie du motif, la valeur est le nombre AVANT ("Restores 4 mana per 5 sec")
+    if string.find(pattern, "PER 5") then
+        local pre = string.sub(line, 1, startPos - 1)
+        local lastPre = nil
+        for n in string.gfind(pre, "([%+%-]?%d+%.?%d*)") do lastPre = n end
+        if lastPre then return tonumber(lastPre) end
+        local _, _, post = string.find(string.sub(line, endPos + 1), "([%+%-]?%d+%.?%d*)")  -- "Mana per 5 sec +3"
+        if post then return tonumber(post) end
+        return nil
+    end
     local after = string.sub(line, startPos)
     local _, _, numAfter = string.find(after, "([%+%-]?%d+%.?%d*)")
     if numAfter then return tonumber(numAfter) end
@@ -210,6 +222,7 @@ function OctoPawn_IsEnchantLine(upper, r, g, b)
 end
 
 print("|cFF00FF00OctoPawn|r scoring stats loaded")
+
 
 
 
