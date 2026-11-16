@@ -10,7 +10,7 @@ local function StatLabel(stat)
         ["RANGED CRIT"] = "RANGED CRIT %", ["RANGED HASTE"] = "RANGED HASTE %",
         ["HOLY CRIT"] = "HOLY CRIT %", AVOIDANCE = "AVOIDANCE %", RESILIENCE = "RESILIENCE %",
         ["EXTRA ATTACK"] = "EXTRA ATTACK %",
-        LIFESTEAL = "LIFESTEAL %", THORNS = "REFLECT DMG", ["CASTING REGEN"] = "CASTING REGEN %",
+        LIFESTEAL = "LIFESTEAL %", THORNS = "REFLECT DMG", ["CASTING REGEN"] = "CASTING MANA REG %", ["COMBAT HEALTH REG"] = "COMBAT HEALTH REG %",
         ["MOVEMENT SPEED"] = "MOVEMENT SPEED %", ["MOUNT SPEED"] = "MOUNT SPEED %",
     }
     return map[stat] or stat
@@ -573,7 +573,7 @@ local compareCheck = MakeOption("OctoPawnCompareCheck", -10, "Show upgrade +/-",
         OctoPawnDB.compareEnabled = this:GetChecked() and true or false
     end)
 local compactCheck = MakeOption("OctoPawnCompactCheck", -70, "Compact tooltips",
-    "Show fewer lines in item tooltips.",
+    "With Show upgrade +/-: one line (OP Score: 42.3 (+1.2) (-0.3)), no slot names.",
     function()
         if not OctoPawnDB then OctoPawnDB = {} end
         OctoPawnDB.compactTooltips = this:GetChecked() and true or false
@@ -1023,3 +1023,4 @@ end
 
 function OctoPawn_OnDBReady() end
 print("|cFF00FF00OctoPawn|r UI loaded")
+
